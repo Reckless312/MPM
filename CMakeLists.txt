@@ -18,6 +18,8 @@ set(SOURCE_FILES src/glad/glad.c src/main.cpp
         src/TextureLoader/TextureLoader.h
         src/Exceptions/TextureException.cpp
         src/Exceptions/TextureException.h
+        src/Camera/Camera.cpp
+        src/Camera/Camera.h
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

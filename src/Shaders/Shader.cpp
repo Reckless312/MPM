@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <glm/gtc/type_ptr.hpp>
 
 #include "../Exceptions/ShaderException.h"
 
@@ -82,6 +83,10 @@ void Shader::SetInt(const std::string &name, const int value) const {
 
 void Shader::SetFloat(const std::string &name, const float value) const {
     glUniform1f(glGetUniformLocation(this->id, name.c_str()), value);
+}
+
+void Shader::SetMat4(const std::string &name, const glm::mat4 &matrix) const {
+    glUniformMatrix4fv(glGetUniformLocation(this->id, name.c_str()), 1, GL_FALSE, glm::value_ptr(matrix));
 }
 
 void Shader::CheckShaderError(const unsigned int shaderId) const {
