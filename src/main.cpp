@@ -6,40 +6,42 @@
 
 #include "Camera/Camera.h"
 #include "Program/Program.h"
-#include "Exceptions/ProgramException.h"
-#include "Exceptions/ShaderException.h"
-#include "Exceptions/TextureException.h"
+#include "Exceptions/MPMException.h"
 #include "Shaders/Shader.h"
 #include "TextureLoader/TextureLoader.h"
 
-int main() {
-    Camera camera;
+int main()
+{
+    Program program;
 
-    Program program(camera);
-
-    Program::InitializeGLFW();
-
-    try {
+    try
+    {
+        Program::InitializeGLFW();
         program.CreateWindowAndAssignContext();
+
         Program::LoadGladLibrary();
-    } catch (const ProgramException& exception) {
-        return Program::ReportErrorAndTerminate(exception.what());
+        program.LockCursor();
+    }
+    catch (const MPMException& exception)
+    {
+        Program::ReportErrorAndTerminate(exception);
     }
 
     Program::SetDefaultBackgroundToPurple();
+    program.SetViewportAndResizeCallback();
 
-    program.SetViewportAndCallbacks();
-    program.LockCursor();
+    Camera camera(program.window, Program::windowWidth, Program::windowHeight);
+    camera.AssignUserPointerAndSetCallbacks();
 
-    const char* vertexShader = "vertexShader.vs";
-    const char* fragmentShader = "fragmentShader.fs";
+    const Shader shaderProgram("vertexShader.vs", "fragmentShader.fs");
 
-    const Shader shaderProgram(vertexShader, fragmentShader);
-
-    try {
+    try
+    {
         shaderProgram.Load();
-    } catch (const ShaderException& exception) {
-        return Program::ReportErrorAndTerminate(exception.what());
+    }
+    catch (const MPMException& exception)
+    {
+        return Program::ReportErrorAndTerminate(exception);
     }
 
     // ------------------------- Temp Code Start ------------------------- //
@@ -139,10 +141,13 @@ int main() {
 
     TextureLoader textureLoader("skong.jpeg");
 
-    try {
+    try
+    {
         textureLoader.Load();
-    } catch (const TextureException& exception) {
-        return Program::ReportErrorAndTerminate(exception.what());
+    }
+    catch (const MPMException& exception)
+    {
+        return Program::ReportErrorAndTerminate(exception);
     }
 
     glEnable(GL_DEPTH_TEST);
@@ -153,13 +158,14 @@ int main() {
         camera.UpdateSpeed(program.deltaTime);
 
         program.ProcessInput();
+        camera.ProcessInput();
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         shaderProgram.Use();
 
         shaderProgram.SetMat4("view", camera.viewMatrix);
-        shaderProgram.SetMat4("projection", program.projectionMatrix);
+        shaderProgram.SetMat4("projection", camera.projectionMatrix);
 
         textureLoader.Bind(GL_TEXTURE0);
 
@@ -179,8 +185,6 @@ int main() {
         glfwSwapBuffers(program.window);
         glfwPollEvents();
     }
-
-    glfwTerminate();
 
     return 0;
 }

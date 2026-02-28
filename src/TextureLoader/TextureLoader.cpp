@@ -1,36 +1,36 @@
 #include "TextureLoader.h"
 
-#include "Exceptions/TextureException.h"
+#include "Exceptions/MPMException.h"
 #include "glad/glad.h"
 #include "stb image/stb_image.h"
 
-TextureLoader::TextureLoader(const char *path) {
+TextureLoader::TextureLoader(const char *path) : id(0), width(0), height(0), nrChannels(0)
+{
     stbi_set_flip_vertically_on_load(true);
-
-    this->id = 0;
-
-    this->width = 0;
-    this->height = 0;
-    this->nrChannels = 0;
 
     this->path = std::string(ASSETS_PATH) + path;
 }
 
-void TextureLoader::Load() {
-    unsigned char *data = stbi_load(this->path.c_str(), &width, &height, &nrChannels, 0);
+void TextureLoader::Load()
+{
+    constexpr int desiredChannels = 0;
+    unsigned char *data = stbi_load(this->path.c_str(), &width, &height, &nrChannels, desiredChannels);
 
-    if (data == nullptr) {
-        throw TextureException("Failed to load texture");
+    if (data == nullptr)
+    {
+        throw MPMException("Failed to load texture", Error::TextureLoad);
     }
 
     GLint internalFormat = GL_RED;
     GLenum format = GL_RED;
 
-    if (nrChannels == this->formatRGBCode) {
+    if (nrChannels == this->formatRGBCode)
+    {
         internalFormat = GL_RGB;
         format = GL_RGB;
     }
-    else if (nrChannels == this->formatRGBACode) {
+    else if (nrChannels == this->formatRGBACode)
+    {
         internalFormat = GL_RGBA;
         format = GL_RGBA;
     }
@@ -52,7 +52,8 @@ void TextureLoader::Load() {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void TextureLoader::Bind(const GLenum textureUnit) const {
+void TextureLoader::Bind(const GLenum textureUnit) const
+{
     glActiveTexture(textureUnit);
     glBindTexture(GL_TEXTURE_2D, this->id);
 }

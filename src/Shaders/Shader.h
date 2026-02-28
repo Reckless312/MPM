@@ -1,10 +1,11 @@
 #ifndef MPM_METHOD_SHADER_H
 #define MPM_METHOD_SHADER_H
+
 #include <string>
 #include <GL/gl.h>
-#include <glm/fwd.hpp>
 
-class Shader {
+class Shader
+{
 public:
     Shader(const char* vertexShaderPath, const char* fragmentShaderPath);
     ~Shader();

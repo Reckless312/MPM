@@ -1,27 +1,28 @@
 #ifndef MPM_METHOD_TEXTURELOADER_H
 #define MPM_METHOD_TEXTURELOADER_H
+
 #include <string>
 
 #include "glad/glad.h"
 
-
-class TextureLoader {
+class TextureLoader
+{
 public:
     explicit TextureLoader(const char* path);
 
     void Load();
     void Bind(GLenum textureUnit) const;
 private:
-    const int formatRGBCode = 3;
-    const int formatRGBACode = 4;
-
     GLuint id;
+
+    std::string path;
 
     int width;
     int height;
     int nrChannels;
 
-    std::string path;
+    const int formatRGBCode = 3;
+    const int formatRGBACode = 4;
 };
 
 
