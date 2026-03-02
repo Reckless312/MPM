@@ -2,13 +2,14 @@
 #define MPM_METHOD_CAMERA_H
 
 #include <GLFW/glfw3.h>
-#include <glm/gtc/matrix_transform.hpp>
 
 class Camera
 {
 public:
     glm::mat4 viewMatrix{};
     glm::mat4 projectionMatrix{};
+
+    glm::vec3 position{};
 
     explicit Camera(GLFWwindow* window, GLsizei windowWidth, GLsizei windowHeight);
 
@@ -22,7 +23,6 @@ public:
 private:
     GLFWwindow* window;
 
-    glm::vec3 position{};
     glm::vec3 front{};
     glm::vec3 up{};
     glm::vec3 right{};
