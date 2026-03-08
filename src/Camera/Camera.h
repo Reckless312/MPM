@@ -10,6 +10,7 @@ public:
     glm::mat4 projectionMatrix{};
 
     glm::vec3 position{};
+    glm::vec3 front{};
 
     explicit Camera(GLFWwindow* window, GLsizei windowWidth, GLsizei windowHeight);
 
@@ -23,7 +24,6 @@ public:
 private:
     GLFWwindow* window;
 
-    glm::vec3 front{};
     glm::vec3 up{};
     glm::vec3 right{};
     glm::vec3 direction{};
