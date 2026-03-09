@@ -33,11 +33,6 @@ public:
     void ProcessInput() const;
     void UpdateDeltaTime();
 
-    /**
-     * Temporary
-     */
-    static void SetDefaultBackgroundToPurple();
-
     static void InitializeGLFW();
     static void LoadGladLibrary();
     static void ResizeWindow(GLFWwindow* window, int width, int height);

@@ -2,7 +2,7 @@
 
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
-#include "TextureLoader/TextureLoader.h"
+#include "../Shaders/TextureLoader.h"
 
 Model::Model(const std::string &path)
 {
@@ -133,10 +133,12 @@ std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *mat, const ai
         if (!skip)
         {
             Texture texture;
+
             texture.id = TextureLoader::StaticLoad(localPath.C_Str(), this->directory);
             texture.type = typeName;
             texture.path = localPath.C_Str();
             textures.push_back(texture);
+
             this->loadedTextures.push_back(texture);
         }
     }

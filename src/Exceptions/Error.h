@@ -3,16 +3,16 @@
 
 enum class Error
 {
-    GLFWInitialization,
-    GLFWCreateWindow,
-    GladLoadLibrary,
-    LockCursor,
-    ShaderFileRead,
-    ShaderCompile,
-    ShaderLink,
-    TextureLoad,
-    GLFWLoadUserPointer,
-    ModelLoad,
+    GLFWInitialization = 1,
+    GLFWCreateWindow = 2,
+    GladLoadLibrary = 3,
+    LockCursor = 4,
+    ShaderFileRead = 5,
+    ShaderCompile = 6,
+    ShaderLink = 7,
+    TextureLoad = 8,
+    GLFWLoadUserPointer = 9,
+    ModelLoad = 10,
 };
 
 #endif

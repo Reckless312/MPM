@@ -88,12 +88,3 @@ void Program::LockCursor() const
         throw MPMException("Failed to lock the cursor", Error::LockCursor);
     }
 }
-
-/**
- * It just looks better :>
- */
-void Program::SetDefaultBackgroundToPurple() {
-    constexpr float red = 0.239f, green = 0.122f, blue = 0.361f, alpha = 1.0f;
-
-    glClearColor(red, green, blue, alpha);
-}

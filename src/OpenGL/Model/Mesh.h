@@ -7,7 +7,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-#include "Shaders/Shader.h"
+#include "OpenGL/Shaders/Shader.h"
 
 struct Vertex {
     glm::vec3 Position;
@@ -29,6 +29,7 @@ public:
     std::vector<Texture> textures;
 
     Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures);
+
     void Draw(const Shader &shader) const;
 private:
     unsigned int VAO{}, VBO{}, EBO{};

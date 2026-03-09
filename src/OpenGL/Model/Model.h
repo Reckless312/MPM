@@ -5,8 +5,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 
-#include "Mesh/Mesh.h"
-#include "Shaders/Shader.h"
+#include "Mesh.h"
+#include "OpenGL/Shaders/Shader.h"
 
 
 class Model
