@@ -17,11 +17,13 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Scene/Camera.cpp
         src/OpenGL/Scene/Camera.h
         src/Exceptions/Error.h
-        src/OpenGL/Model/Mesh.cpp
-        src/OpenGL/Model/Mesh.h
-        src/OpenGL/Model/Model.cpp
-        src/OpenGL/Model/Model.h
-        src/main_temp_code.cpp
+        src/OpenGL/Render/RenderObject.h
+        src/OpenGL/Render/Mesh.cpp
+        src/OpenGL/Render/Mesh.h
+        src/OpenGL/Render/Model.cpp
+        src/OpenGL/Render/Model.h
+        src/OpenGL/Render/Particle.h
+        src/OpenGL/Render/Particle.cpp
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

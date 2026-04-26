@@ -1,4 +1,4 @@
-#include "../Model/Mesh.h"
+#include "OpenGL/Render/Mesh.h"
 
 Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures)
 {
@@ -6,7 +6,7 @@ Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> 
     this->indices = indices;
     this->textures = textures;
 
-    setupMesh();
+    this->setupMesh();
 }
 
 void Mesh::Draw(const Shader &shader) const
@@ -14,12 +14,12 @@ void Mesh::Draw(const Shader &shader) const
     unsigned int diffuseNumber = 1;
     unsigned int specularNumber = 1;
 
-    for(unsigned int i = 0; i < textures.size(); i++)
+    for (unsigned int textureId = 0; textureId < textures.size(); textureId++)
     {
-        glActiveTexture(GL_TEXTURE0 + i);
+        glActiveTexture(GL_TEXTURE0 + textureId);
 
         std::string number;
-        std::string name = textures[i].type;
+        std::string name = textures[textureId].type;
 
         if(name == "texture_diffuse")
         {
@@ -34,8 +34,8 @@ void Mesh::Draw(const Shader &shader) const
         materialName.append(name);
         materialName.append(number);
 
-        shader.SetInt(materialName, static_cast<int>(i));
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+        shader.SetInt(materialName, static_cast<int>(textureId));
+        glBindTexture(GL_TEXTURE_2D, textures[textureId].id);
     }
 
     glActiveTexture(GL_TEXTURE0);

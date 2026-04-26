@@ -3,11 +3,14 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
+#include <random>
 
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Program.h"
 #include "Exceptions/MPMException.h"
-#include "OpenGL/Model/Model.h"
+#include "OpenGL/Render/Model.h"
+#include "OpenGL/Render/Particle.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Shaders/TextureLoader.h"
 
@@ -33,33 +36,37 @@ int main()
     Camera camera(program.window, Program::windowWidth, Program::windowHeight);
     camera.AssignUserPointerAndSetCallbacks();
 
-    Model snowTerrain("/home/cora/GitHub/MPM-Method/src/Assets/snow_mountain.obj");
-
-    try
-    {
-        snowTerrain.loadModel();
-    }
-    catch (const MPMException& exception)
-    {
-        return Program::ReportErrorAndTerminate(exception);
-    }
-
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
+    Shader particleShader("particleVertex.vs", "particleFragment.fs");
 
     try
     {
         sceneShader.Load();
+        particleShader.Load();
     }
     catch (const MPMException& exception)
     {
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, -35.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(500.0f));
+    std::random_device randomDevice;
+    std::mt19937 randomEngine(randomDevice());
+    std::uniform_real_distribution distribution(-0.5f, 0.5f);
+
+    std::vector<glm::vec3> snowballPositions;
+
+    while (snowballPositions.size() < 300000)
+    {
+        if (glm::vec3 point(distribution(randomEngine), distribution(randomEngine), distribution(randomEngine)); glm::length(point) <= 0.5f)
+        {
+            snowballPositions.push_back(point);
+        }
+    }
+
+    Particle snowball(snowballPositions);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -71,22 +78,10 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        sceneShader.Use();
-
-        sceneShader.SetMat4("model", model);
-        sceneShader.SetMat4("view", camera.viewMatrix);
-        sceneShader.SetMat4("projection", camera.projectionMatrix);
-        sceneShader.SetMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
-
-        sceneShader.SetVec3("viewPosition", camera.position);
-        sceneShader.SetFloat("material.shininess", 32.0f);
-
-        sceneShader.SetVec3("directionalLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
-        sceneShader.SetVec3("directionalLight.ambient", glm::vec3(0.3f, 0.3f, 0.3f));
-        sceneShader.SetVec3("directionalLight.diffuse", glm::vec3(0.7f, 0.7f, 0.7f));
-        sceneShader.SetVec3("directionalLight.specular", glm::vec3(0.8f, 0.8f, 0.8f));
-
-        snowTerrain.Draw(sceneShader);
+        particleShader.Use();
+        particleShader.SetMat4("view", camera.viewMatrix);
+        particleShader.SetMat4("projection", camera.projectionMatrix);
+        snowball.Draw(particleShader);
 
         glfwSwapBuffers(program.window);
         glfwPollEvents();

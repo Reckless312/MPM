@@ -35,10 +35,12 @@ void Model::loadModel()
 
 void Model::processNode(const aiNode *node, const aiScene *scene)
 {
+    this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
+
     for (int i = 0; i < node->mNumMeshes; i++)
     {
         aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
-        this->meshes.push_back(this->processMesh(mesh, scene));
+        this->processMesh(mesh, scene);
     }
 
     for (int i = 0; i < node->mNumChildren; i++)
@@ -47,7 +49,7 @@ void Model::processNode(const aiNode *node, const aiScene *scene)
     }
 }
 
-Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
+void Model::processMesh(aiMesh *mesh, const aiScene *scene)
 {
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
@@ -105,26 +107,26 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
     std::vector<Texture> specularMaps = this->loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
-    return {vertices, indices, textures};
+    this->meshes.emplace_back(vertices, indices, textures);
 }
 
-std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *mat, const aiTextureType type, const std::string &typeName)
+std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *material, const aiTextureType type, const std::string &typeName)
 {
     std::vector<Texture> textures;
 
-    for (int i = 0; i < mat->GetTextureCount(type); i++)
+    for (int textureIndex = 0; textureIndex < material->GetTextureCount(type); textureIndex++)
     {
         aiString localPath;
 
-        mat->GetTexture(type, i, &localPath);
+        material->GetTexture(type, textureIndex, &localPath);
 
         bool skip = false;
 
-        for (int j = 0; j < this->loadedTextures.size(); j++)
+        for (int loadedTextureIndex = 0; loadedTextureIndex < this->loadedTextures.size(); loadedTextureIndex++)
         {
-            if (std::strcmp(loadedTextures[j].path.data(), localPath.C_Str()) == 0)
+            if (std::strcmp(loadedTextures[loadedTextureIndex].path.data(), localPath.C_Str()) == 0)
             {
-                textures.push_back(loadedTextures[j]);
+                textures.push_back(loadedTextures[loadedTextureIndex]);
                 skip = true;
                 break;
             }

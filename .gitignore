@@ -22,3 +22,6 @@ Release/
 x64/
 
 .idea/
+
+# CMake build output
+build/

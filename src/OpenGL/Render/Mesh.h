@@ -8,6 +8,7 @@
 #include <GLFW/glfw3.h>
 
 #include "OpenGL/Shaders/Shader.h"
+#include "OpenGL/Render/RenderObject.h"
 
 struct Vertex {
     glm::vec3 Position;
@@ -22,7 +23,7 @@ struct Texture {
     std::string path;
 };
 
-class Mesh {
+class Mesh : public RenderObject {
 public:
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
@@ -30,9 +31,9 @@ public:
 
     Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures);
 
-    void Draw(const Shader &shader) const;
+    void Draw(const Shader &shader) const override;
 private:
-    unsigned int VAO{}, VBO{}, EBO{};
+    unsigned int EBO{};
 
     void setupMesh();
 };

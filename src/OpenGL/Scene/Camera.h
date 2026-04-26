@@ -2,6 +2,7 @@
 #define MPM_METHOD_CAMERA_H
 
 #include <GLFW/glfw3.h>
+#include <glm/vec3.hpp>
 
 class Camera
 {
@@ -33,7 +34,7 @@ private:
     float mouseXDirection;
     float mouseYDirection;
 
-    float speed = 20.0f;
+    float speed = 5.0f;
 
     float yaw = -90.0f;
     float pitch = 0.0f;
@@ -41,11 +42,11 @@ private:
 
     bool firstMouse = true;
 
-    const float speedMultiplier = 20.0f;
+    const float speedMultiplier = 5.0f;
     const float sensitivity = 0.1f;
 
     const float nearPlane = 0.1f;
-    const float farPlane = 350.0f;
+    const float farPlane = 700.0f;
 
     const float maxPitch = 89.0f;
     const float minPitch = -89.0f;
