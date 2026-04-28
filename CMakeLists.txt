@@ -4,7 +4,6 @@ project(MPM_Method LANGUAGES C CXX CUDA)
 set(CMAKE_CUDA_STANDARD 20)
 
 set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
-        src/CUDA/kernel.cu
         src/OpenGL/Shaders/Shader.cpp
         src/OpenGL/Shaders/Shader.h
         src/OpenGL/Program.cpp
@@ -24,6 +23,11 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Render/Model.h
         src/OpenGL/Render/Particle.h
         src/OpenGL/Render/Particle.cpp
+        src/CUDA/HashTable.h
+        src/CUDA/HashTable.cu
+        src/CUDA/GridBuffer.h
+        src/CUDA/ParticleBuffer.h
+        src/CUDA/RebuildMapping.cu
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})
