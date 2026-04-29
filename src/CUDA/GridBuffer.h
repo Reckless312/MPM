@@ -2,8 +2,8 @@
 #define MPM_METHOD_GRID_BUFFER_H
 
 struct GridBlock {
-    float mass[32];
-    float vx[32], vy[32], vz[32];
+    float mass[512];
+    float velocityX[512], velocityY[512], velocityZ[512];
 };
 
 #endif

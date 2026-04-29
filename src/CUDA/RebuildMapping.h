@@ -7,9 +7,10 @@
 #include "HashTable.h"
 
 constexpr int blockSize = 8;
+constexpr float freeZoneShift = 0.5f;
 
 #ifdef __CUDACC__
-__global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, const float cellSize);
+__global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, float cellSize);
 #endif
 
 #endif

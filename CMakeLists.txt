@@ -27,7 +27,14 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/HashTable.cu
         src/CUDA/GridBuffer.h
         src/CUDA/ParticleBuffer.h
+        src/CUDA/Morton.h
+        src/CUDA/Morton.cu
+        src/CUDA/RebuildMapping.h
         src/CUDA/RebuildMapping.cu
+        src/CUDA/SortParticles.h
+        src/CUDA/SortParticles.cu
+        src/CUDA/P2G.h
+        src/CUDA/P2G.cu
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

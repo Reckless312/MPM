@@ -2,12 +2,12 @@
 #define MPM_METHOD_PARTICLE_BUFFER_H
 
 struct ParticleBlock {
-    float x[32], y[32], z[32];
-    float vx[32], vy[32], vz[32];
-    float F[9][32];
-    float Cp[9][32];
+    float positionX[32], positionY[32], positionZ[32];
+    float velocityX[32], velocityY[32], velocityZ[32];
+    float deformationGradient[9][32];
+    float affineMomentumMatrix[9][32];
     float mass[32];
-    float vol[32];
+    float volume[32];
 };
 
 #endif
