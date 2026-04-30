@@ -8,6 +8,7 @@ struct ParticleBlock {
     float affineMomentumMatrix[9][32];
     float mass[32];
     float volume[32];
+    float plasticVolume[32];
 };
 
 #endif

@@ -35,6 +35,14 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/SortParticles.cu
         src/CUDA/P2G.h
         src/CUDA/P2G.cu
+        src/CUDA/UpdateGrid.h
+        src/CUDA/UpdateGrid.cu
+        src/CUDA/G2P.h
+        src/CUDA/G2P.cu
+        src/CUDA/Simulation.h
+        src/CUDA/Simulation.cu
+        src/OpenGL/Configuration/Snow.cpp
+        src/OpenGL/Configuration/Snow.h
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

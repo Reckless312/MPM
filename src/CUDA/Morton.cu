@@ -21,6 +21,24 @@ __device__ uint64_t expandBits(const uint32_t value)
     return expanded;
 }
 
+__device__ uint32_t compactBits(uint64_t value)
+{
+    value &= everyThirdBitMask;
+    value = (value | value >> 2) & separatePairsMask;
+    value = (value | value >> 4) & separateNibblesMask;
+    value = (value | value >> 8) & separateBytesMask;
+    value = (value | value >> 16) & separateHalvesMask;
+    value = (value | value >> 32) & twentyOneBitMask;
+    return static_cast<uint32_t>(value);
+}
+
+__device__ void mortonDecode(const uint64_t code, int& coordinateX, int& coordinateY, int& coordinateZ)
+{
+    coordinateX = static_cast<int>(compactBits(code));
+    coordinateY = static_cast<int>(compactBits(code >> 1));
+    coordinateZ = static_cast<int>(compactBits(code >> 2));
+}
+
 __device__ uint64_t mortonEncode(const int coordinateX, const int coordinateY, const int coordinateZ)
 {
     return expandBits(static_cast<uint32_t>(coordinateX)) | (expandBits(static_cast<uint32_t>(coordinateY)) << 1) | (expandBits(static_cast<uint32_t>(coordinateZ)) << 2);

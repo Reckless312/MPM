@@ -7,7 +7,7 @@ __device__ uint32_t hashCode(const uint64_t blockCode, const uint32_t capacity)
     return static_cast<uint32_t>(hashCode % capacity);
 }
 
-__device__ void insert(const HashTable& table, const uint64_t blockCode, uint32_t* nextBlockIndex)
+__device__ void insert(const HashTable& table, const uint64_t blockCode, uint32_t* nextBlockIndex, uint64_t* blockCodes)
 {
     uint32_t slot = hashCode(blockCode, table.capacity);
 
@@ -18,7 +18,9 @@ __device__ void insert(const HashTable& table, const uint64_t blockCode, uint32_
 
         if (previousValue == EMPTY_CELL)
         {
-            table.values[slot] = atomicAdd(nextBlockIndex, 1u);
+            const uint32_t blockIndex = atomicAdd(nextBlockIndex, 1u);
+            table.values[slot] = blockIndex;
+            blockCodes[blockIndex] = blockCode;
             return;
         }
 

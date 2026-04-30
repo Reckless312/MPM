@@ -13,7 +13,7 @@ struct HashTable {
 
 #ifdef __CUDACC__
 __device__ uint32_t hashCode(uint64_t blockCode, uint32_t capacity);
-__device__ void insert(const HashTable& table, uint64_t blockCode, uint32_t* nextBlockIndex);
+__device__ void insert(const HashTable& table, uint64_t blockCode, uint32_t* nextBlockIndex, uint64_t* blockCodes);
 __device__ uint32_t lookup(const HashTable& table, uint64_t blockCode);
 #endif
 

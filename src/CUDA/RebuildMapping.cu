@@ -2,7 +2,7 @@
 #include "Morton.h"
 #include <cuda_runtime.h>
 
-__global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, const float cellSize)
+__global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, uint64_t* blockCodes, const float cellSize)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -39,7 +39,7 @@ __global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const 
             for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
             {
                 const uint64_t neighborBlockCode = mortonEncode(blockX + offsetX, blockY + offsetY, blockZ + offsetZ);
-                insert(hashTable, neighborBlockCode, nextBlockIndex);
+                insert(hashTable, neighborBlockCode, nextBlockIndex, blockCodes);
             }
         }
     }

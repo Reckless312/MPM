@@ -78,6 +78,7 @@ __global__ void reorderParticlesKernel(const ParticleBlock* inputBlocks, Particl
 
     outputBlocks[newParticleBlockIndex].mass[newParticleLane] = inputBlocks[oldParticleBlockIndex].mass[oldParticleLane];
     outputBlocks[newParticleBlockIndex].volume[newParticleLane] = inputBlocks[oldParticleBlockIndex].volume[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].plasticVolume[newParticleLane] = inputBlocks[oldParticleBlockIndex].plasticVolume[oldParticleLane];
 }
 
 __global__ void initIndicesKernel(uint32_t* indices, const int particleCount)

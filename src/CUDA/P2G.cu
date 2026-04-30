@@ -19,7 +19,7 @@ __device__ void computeBSplineWeights(const float fractionalX, const float fract
     weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }
 
-__global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter)
+__global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -41,6 +41,7 @@ __global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
 
     const float mass = particleBlocks[particleBlockIndex].mass[lane];
     const float volume = particleBlocks[particleBlockIndex].volume[lane];
+    const float plasticVolume = particleBlocks[particleBlockIndex].plasticVolume[lane];
 
     float affineMomentumMatrix[9];
     float deformationGradient[9];
@@ -83,17 +84,21 @@ __global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     const float a21 = deformationGradient[7] - r21;
     const float a22 = deformationGradient[8] - r22;
 
-    const float volumetricStress = firstLameParameter * (J - 1.0f) * J;
+    const float hardening = expf(hardeningCoefficient * (1.0f - plasticVolume));
+    const float effectiveShearModulus = shearModulus * hardening;
+    const float effectiveFirstLameParameter = firstLameParameter * hardening;
 
-    const float kirchhoff00 = 2.0f * shearModulus * (a00*deformationGradient[0] + a01*deformationGradient[1] + a02*deformationGradient[2]) + volumetricStress;
-    const float kirchhoff01 = 2.0f * shearModulus * (a00*deformationGradient[3] + a01*deformationGradient[4] + a02*deformationGradient[5]);
-    const float kirchhoff02 = 2.0f * shearModulus * (a00*deformationGradient[6] + a01*deformationGradient[7] + a02*deformationGradient[8]);
-    const float kirchhoff10 = 2.0f * shearModulus * (a10*deformationGradient[0] + a11*deformationGradient[1] + a12*deformationGradient[2]);
-    const float kirchhoff11 = 2.0f * shearModulus * (a10*deformationGradient[3] + a11*deformationGradient[4] + a12*deformationGradient[5]) + volumetricStress;
-    const float kirchhoff12 = 2.0f * shearModulus * (a10*deformationGradient[6] + a11*deformationGradient[7] + a12*deformationGradient[8]);
-    const float kirchhoff20 = 2.0f * shearModulus * (a20*deformationGradient[0] + a21*deformationGradient[1] + a22*deformationGradient[2]);
-    const float kirchhoff21 = 2.0f * shearModulus * (a20*deformationGradient[3] + a21*deformationGradient[4] + a22*deformationGradient[5]);
-    const float kirchhoff22 = 2.0f * shearModulus * (a20*deformationGradient[6] + a21*deformationGradient[7] + a22*deformationGradient[8]) + volumetricStress;
+    const float volumetricStress = effectiveFirstLameParameter * (J - 1.0f) * J;
+
+    const float kirchhoff00 = 2.0f * effectiveShearModulus * (a00*deformationGradient[0] + a01*deformationGradient[1] + a02*deformationGradient[2]) + volumetricStress;
+    const float kirchhoff01 = 2.0f * effectiveShearModulus * (a00*deformationGradient[3] + a01*deformationGradient[4] + a02*deformationGradient[5]);
+    const float kirchhoff02 = 2.0f * effectiveShearModulus * (a00*deformationGradient[6] + a01*deformationGradient[7] + a02*deformationGradient[8]);
+    const float kirchhoff10 = 2.0f * effectiveShearModulus * (a10*deformationGradient[0] + a11*deformationGradient[1] + a12*deformationGradient[2]);
+    const float kirchhoff11 = 2.0f * effectiveShearModulus * (a10*deformationGradient[3] + a11*deformationGradient[4] + a12*deformationGradient[5]) + volumetricStress;
+    const float kirchhoff12 = 2.0f * effectiveShearModulus * (a10*deformationGradient[6] + a11*deformationGradient[7] + a12*deformationGradient[8]);
+    const float kirchhoff20 = 2.0f * effectiveShearModulus * (a20*deformationGradient[0] + a21*deformationGradient[1] + a22*deformationGradient[2]);
+    const float kirchhoff21 = 2.0f * effectiveShearModulus * (a20*deformationGradient[3] + a21*deformationGradient[4] + a22*deformationGradient[5]);
+    const float kirchhoff22 = 2.0f * effectiveShearModulus * (a20*deformationGradient[6] + a21*deformationGradient[7] + a22*deformationGradient[8]) + volumetricStress;
 
     const float stressScale = -4.0f / (cellSize * cellSize) * volume * deltaTime;
 
