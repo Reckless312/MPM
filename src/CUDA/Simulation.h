@@ -7,50 +7,38 @@
 #include "ParticleBuffer.h"
 #include "GridBuffer.h"
 #include "HashTable.h"
-
-struct SimulationParameters
-{
-    int particleCount;
-    int maxBlocks;
-    int gridSizeInCells;
-    float cellSize;
-    float deltaTime;
-    float gravity;
-    float shearModulus;
-    float firstLameParameter;
-    float hardeningCoefficient;
-    float criticalCompression;
-    float criticalStretch;
-};
+#include "OpenGL/Simulation/Configuration.h"
 
 class Simulation
 {
 public:
-    Simulation(const SimulationParameters& parameters, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
+    Simulation(int particleCount, const Configuration& configuration, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
     ~Simulation();
     void step();
     void copyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const;
     const ParticleBlock* getParticleBlocks() const;
 
 private:
-    SimulationParameters m_parameters;
+    int particleCount;
 
-    ParticleBlock* m_particleBlocks;
-    ParticleBlock* m_particleBlocksBuffer;
-    GridBlock* m_gridBlocks;
+    Configuration configuration;
 
-    HashTable m_hashTable;
-    uint32_t* m_nextBlockIndex;
-    uint64_t* m_blockCodes;
+    ParticleBlock* particleBlocks;
+    ParticleBlock* particleBlocksSortingBuffer;
+    GridBlock* gridBlocks;
 
-    uint64_t* m_sortKeys;
-    uint64_t* m_sortKeysOut;
-    uint32_t* m_indices;
-    uint32_t* m_sortedIndices;
-    void* m_cubTempStorage;
-    size_t m_cubTempStorageBytes;
+    HashTable blockCodeToIndex;
+    uint32_t* nextBlockIndex;
+    uint64_t* blockCodes;
 
-    ParticleBlock* m_hostParticleBlocks;
+    uint64_t* particleSortKeys;
+    uint64_t* particleSortKeysResult;
+    uint32_t* particleIndices;
+    uint32_t* sortedParticleIndices;
+    void* nvidiaCUBTemporaryStorage;
+    size_t nvidiaCUBTemporaryStorageBytes;
+
+    ParticleBlock* hostParticleBlocks;
 };
 
 #endif

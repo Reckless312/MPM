@@ -41,8 +41,9 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/G2P.cu
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
-        src/OpenGL/Configuration/Snow.cpp
-        src/OpenGL/Configuration/Snow.h
+        src/OpenGL/Simulation/Snowball.cpp
+        src/OpenGL/Simulation/Snowball.h
+        src/OpenGL/Simulation/Configuration.h
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

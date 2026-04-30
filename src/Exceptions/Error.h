@@ -13,6 +13,8 @@ enum class Error
     TextureLoad = 8,
     GLFWLoadUserPointer = 9,
     ModelLoad = 10,
+    PositionMemoryAllocation = 11,
+    BlocksMemoryAllocation = 12,
 };
 
 #endif

@@ -23,6 +23,8 @@ public:
     static constexpr GLsizei windowWidth = 800;
     static constexpr GLsizei windowHeight = 600;
 
+    static constexpr float pi = 3.14159265f;
+
     explicit Program();
     ~Program();
 

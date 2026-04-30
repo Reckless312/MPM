@@ -70,6 +70,11 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const uint64_t blockCode = mortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
                 const uint32_t blockIndex = lookup(hashTable, blockCode);
 
+                if (blockIndex == UINT32_MAX)
+                {
+                    continue;
+                }
+
                 const auto localX = static_cast<uint32_t>(nodeX & 7);
                 const auto localY = static_cast<uint32_t>(nodeY & 7);
                 const auto localZ = static_cast<uint32_t>(nodeZ & 7);
