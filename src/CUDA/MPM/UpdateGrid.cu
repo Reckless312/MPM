@@ -1,6 +1,6 @@
 #include "UpdateGrid.h"
-#include "Morton.h"
-#include "RebuildMapping.h"
+#include "../Structures/Morton.h"
+#include "../Preparation/RebuildMapping.h"
 #include <cuda_runtime.h>
 
 __global__ void updateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const float cellSize, const int gridSizeInCells)
@@ -23,11 +23,11 @@ __global__ void updateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCod
     }
 
     int blockX, blockY, blockZ;
-    mortonDecode(blockCodes[gridBlockIndex], blockX, blockY, blockZ);
+    MortonDecode(blockCodes[gridBlockIndex], blockX, blockY, blockZ);
 
-    const int localX = nodeLane & 7;
-    const int localY = (nodeLane >> 3) & 7;
-    const int localZ = (nodeLane >> 6) & 7;
+    const int localX = nodeLane % blockSize;
+    const int localY = (nodeLane / blockSize) % blockSize;
+    const int localZ = (nodeLane / (blockSize * blockSize)) % blockSize;
 
     const int nodeGridX = blockX * blockSize + localX;
     const int nodeGridY = blockY * blockSize + localY;

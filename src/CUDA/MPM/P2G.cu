@@ -1,10 +1,10 @@
 #include "P2G.h"
-#include "RebuildMapping.h"
-#include "Morton.h"
+#include "../Preparation/RebuildMapping.h"
+#include "../Structures/Morton.h"
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
-__device__ void computeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
+__device__ void ComputeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
 {
     weightsX[0] = 0.5f * (1.5f - fractionalX) * (1.5f - fractionalX);
     weightsX[1] = 0.75f - (fractionalX - 1.0f) * (fractionalX - 1.0f);
@@ -19,7 +19,7 @@ __device__ void computeBSplineWeights(const float fractionalX, const float fract
     weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }
 
-__global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient)
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -117,7 +117,7 @@ __global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     const float fractionalZ = gridPositionZ - static_cast<float>(baseZ);
 
     float weightsX[3], weightsY[3], weightsZ[3];
-    computeBSplineWeights(fractionalX, fractionalY, fractionalZ, weightsX, weightsY, weightsZ);
+    ComputeBSplineWeights(fractionalX, fractionalY, fractionalZ, weightsX, weightsY, weightsZ);
 
     for (int neighborX = 0; neighborX < 3; neighborX++)
     {
@@ -143,21 +143,21 @@ __global__ void p2gKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const float momentumY = mass * (velocityY + affineMomentumMatrix[3] * nodeToParticleOffsetX + affineMomentumMatrix[4] * nodeToParticleOffsetY + affineMomentumMatrix[5] * nodeToParticleOffsetZ) + stressScale * stressForceY;
                 const float momentumZ = mass * (velocityZ + affineMomentumMatrix[6] * nodeToParticleOffsetX + affineMomentumMatrix[7] * nodeToParticleOffsetY + affineMomentumMatrix[8] * nodeToParticleOffsetZ) + stressScale * stressForceZ;
 
-                const int nodeBlockX = nodeX >> 3;
-                const int nodeBlockY = nodeY >> 3;
-                const int nodeBlockZ = nodeZ >> 3;
+                const int nodeBlockX = nodeX / blockSize;
+                const int nodeBlockY = nodeY / blockSize;
+                const int nodeBlockZ = nodeZ / blockSize;
 
-                const uint64_t blockCode = mortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = lookup(hashTable, blockCode);
+                const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
+                const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
                 if (blockIndex == UINT32_MAX)
                 {
                     continue;
                 }
 
-                const auto localX = static_cast<uint32_t>(nodeX & 7);
-                const auto localY = static_cast<uint32_t>(nodeY & 7);
-                const auto localZ = static_cast<uint32_t>(nodeZ & 7);
+                const auto localX = static_cast<uint32_t>(nodeX % blockSize);
+                const auto localY = static_cast<uint32_t>(nodeY % blockSize);
+                const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
 
                 const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
 

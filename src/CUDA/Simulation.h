@@ -4,41 +4,45 @@
 #include <cstdint>
 #include <cstddef>
 
-#include "ParticleBuffer.h"
-#include "GridBuffer.h"
-#include "HashTable.h"
+#include "Structures/ParticleBuffer.h"
+#include "Structures/GridBuffer.h"
+#include "Structures/HashTable.h"
 #include "OpenGL/Simulation/Configuration.h"
 
 class Simulation
 {
 public:
-    Simulation(int particleCount, const Configuration& configuration, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
+    Simulation(int particleCount, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
     ~Simulation();
-    void step();
+    void Step();
     void copyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const;
-    const ParticleBlock* getParticleBlocks() const;
+    [[nodiscard]] const ParticleBlock* getParticleBlocks() const;
 
 private:
     int particleCount;
 
     Configuration configuration;
 
-    ParticleBlock* particleBlocks;
-    ParticleBlock* particleBlocksSortingBuffer;
-    GridBlock* gridBlocks;
+    ParticleBlock* particleBlocks{};
+    ParticleBlock* particleBlocksSortingBuffer{};
+    GridBlock* gridBlocks{};
 
-    HashTable blockCodeToIndex;
-    uint32_t* nextBlockIndex;
-    uint64_t* blockCodes;
+    HashTable blockCodeToIndex{};
+    uint32_t* nextBlockIndex{};
+    uint64_t* blockCodes{};
 
-    uint64_t* particleSortKeys;
-    uint64_t* particleSortKeysResult;
-    uint32_t* particleIndices;
-    uint32_t* sortedParticleIndices;
-    void* nvidiaCUBTemporaryStorage;
-    size_t nvidiaCUBTemporaryStorageBytes;
+    uint64_t* particleSortKeys{};
+    uint64_t* particleSortKeysResult{};
+    uint32_t* particleIndices{};
+    uint32_t* sortedParticleIndices{};
 
-    ParticleBlock* hostParticleBlocks;
+    void* nvidiaCUBTemporaryStorage = nullptr;
+
+    size_t nvidiaCUBTemporaryStorageBytes = 0;
+
+    ParticleBlock* hostParticleBlocks{};
+
+    const int threadsPerBlock = 256;
 };
 
 #endif

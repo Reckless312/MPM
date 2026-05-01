@@ -23,24 +23,25 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Render/Model.h
         src/OpenGL/Render/Particle.h
         src/OpenGL/Render/Particle.cpp
-        src/CUDA/HashTable.h
-        src/CUDA/HashTable.cu
-        src/CUDA/GridBuffer.h
-        src/CUDA/ParticleBuffer.h
-        src/CUDA/Morton.h
-        src/CUDA/Morton.cu
-        src/CUDA/RebuildMapping.h
-        src/CUDA/RebuildMapping.cu
-        src/CUDA/SortParticles.h
-        src/CUDA/SortParticles.cu
-        src/CUDA/P2G.h
-        src/CUDA/P2G.cu
-        src/CUDA/UpdateGrid.h
-        src/CUDA/UpdateGrid.cu
-        src/CUDA/G2P.h
-        src/CUDA/G2P.cu
+        src/CUDA/Structures/HashTable.h
+        src/CUDA/Structures/HashTable.cu
+        src/CUDA/Structures/GridBuffer.h
+        src/CUDA/Structures/ParticleBuffer.h
+        src/CUDA/Structures/Morton.h
+        src/CUDA/Structures/Morton.cu
+        src/CUDA/Preparation/RebuildMapping.h
+        src/CUDA/Preparation/RebuildMapping.cu
+        src/CUDA/Preparation/SortParticles.h
+        src/CUDA/Preparation/SortParticles.cu
+        src/CUDA/MPM/P2G.h
+        src/CUDA/MPM/P2G.cu
+        src/CUDA/MPM/UpdateGrid.h
+        src/CUDA/MPM/UpdateGrid.cu
+        src/CUDA/MPM/G2P.h
+        src/CUDA/MPM/G2P.cu
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
+        src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/Snowball.cpp
         src/OpenGL/Simulation/Snowball.h
         src/OpenGL/Simulation/Configuration.h

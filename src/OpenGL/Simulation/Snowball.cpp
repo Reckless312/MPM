@@ -9,12 +9,16 @@
 
 float Snowball::CalculateVolume() const
 {
+    // Sphere Volume Formula
     return 4.0f / 3.0f * Program::pi * this->snowballRadius * this->snowballRadius * this->snowballRadius;
 }
 
 void Snowball::BuildInitialPositions()
 {
+    // Uniform distribution
     this->particleVolume = this->CalculateVolume() / static_cast<float>(this->particleCount);
+
+    // Density = Mass / Volume
     this->particleMass = this->snowDensity * particleVolume;
 
     std::random_device randomDevice;

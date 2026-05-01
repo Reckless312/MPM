@@ -3,7 +3,7 @@
 #include <vector>
 #include <glm/vec3.hpp>
 
-#include "CUDA/ParticleBuffer.h"
+#include "CUDA/Structures/ParticleBuffer.h"
 
 class Snowball
 {

@@ -1,41 +1,43 @@
 #include "Simulation.h"
-#include "RebuildMapping.h"
-#include "SortParticles.h"
-#include "P2G.h"
-#include "UpdateGrid.h"
-#include "G2P.h"
+#include "CudaCheck.h"
+#include "Preparation/RebuildMapping.h"
+#include "Preparation/SortParticles.h"
+#include "MPM/P2G.h"
+#include "MPM/UpdateGrid.h"
+#include "MPM/G2P.h"
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 #include <utility>
 
-constexpr int threadsPerBlock = 256;
-
-Simulation::Simulation(const int particleCount, const Configuration& configuration, const ParticleBlock* initialParticleBlocks, const int particleBlockCount) : particleCount(particleCount), configuration(configuration), nvidiaCUBTemporaryStorage(nullptr), nvidiaCUBTemporaryStorageBytes(0)
+Simulation::Simulation(const int particleCount, const ParticleBlock* initialParticleBlocks, const int particleBlockCount)
 {
-    cudaMalloc(&particleBlocks, particleBlockCount * sizeof(ParticleBlock));
-    cudaMalloc(&particleBlocksSortingBuffer, particleBlockCount * sizeof(ParticleBlock));
-    cudaMalloc(&gridBlocks,  configuration.maxBlocks * sizeof(GridBlock));
+    this->particleCount = particleCount;
 
-    cudaMalloc(&blockCodeToIndex.keys, configuration.maxBlocks * sizeof(uint64_t));
-    cudaMalloc(&blockCodeToIndex.values, configuration.maxBlocks * sizeof(uint32_t));
+    CUDA_CHECK(cudaMalloc(&particleBlocks, particleBlockCount * sizeof(ParticleBlock)));
+    CUDA_CHECK(cudaMalloc(&particleBlocksSortingBuffer, particleBlockCount * sizeof(ParticleBlock)));
+
+    CUDA_CHECK(cudaMalloc(&gridBlocks, configuration.maxBlocks * sizeof(GridBlock)));
+
+    CUDA_CHECK(cudaMalloc(&blockCodeToIndex.keys, configuration.maxBlocks * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&blockCodeToIndex.values, configuration.maxBlocks * sizeof(uint32_t)));
     blockCodeToIndex.capacity = static_cast<uint32_t>(configuration.maxBlocks);
 
-    cudaMalloc(&nextBlockIndex, sizeof(uint32_t));
-    cudaMalloc(&blockCodes, configuration.maxBlocks * sizeof(uint64_t));
+    CUDA_CHECK(cudaMalloc(&nextBlockIndex, sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&blockCodes, configuration.maxBlocks * sizeof(uint64_t)));
 
-    cudaMalloc(&particleSortKeys, particleCount * sizeof(uint64_t));
-    cudaMalloc(&particleSortKeysResult, particleCount * sizeof(uint64_t));
-    cudaMalloc(&particleIndices, particleCount * sizeof(uint32_t));
-    cudaMalloc(&sortedParticleIndices, particleCount * sizeof(uint32_t));
+    CUDA_CHECK(cudaMalloc(&particleSortKeys, particleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&particleSortKeysResult, particleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&particleIndices, particleCount * sizeof(uint32_t)));
 
-    cudaMemcpy(particleBlocks, initialParticleBlocks, particleBlockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice);
+    CUDA_CHECK(cudaMalloc(&sortedParticleIndices, particleCount * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMemcpy(particleBlocks, initialParticleBlocks, particleBlockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
 
-    cub::DeviceRadixSort::SortPairs(nullptr, nvidiaCUBTemporaryStorageBytes, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, particleCount);
+    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(nullptr, nvidiaCUBTemporaryStorageBytes, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, particleCount));
 
-    cudaMalloc(&nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes);
+    CUDA_CHECK(cudaMalloc(&nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes));
 
     const int blockCount = (particleCount + 31) / 32;
-    cudaMallocHost(&hostParticleBlocks, blockCount * sizeof(ParticleBlock));
+    CUDA_CHECK(cudaMallocHost(&hostParticleBlocks, blockCount * sizeof(ParticleBlock)));
 }
 
 Simulation::~Simulation()
@@ -55,29 +57,40 @@ Simulation::~Simulation()
     cudaFreeHost(hostParticleBlocks);
 }
 
-void Simulation::step()
+void Simulation::Step()
 {
-    const int particleCount = this->particleCount;
-    const int maxBlocks = configuration.maxBlocks;
-    const int launchBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
+    const int launchBlocks = (this->particleCount + threadsPerBlock - 1) / threadsPerBlock;
 
-    cudaMemset(blockCodeToIndex.keys, 0xFF, maxBlocks * sizeof(uint64_t));
-    cudaMemset(nextBlockIndex, 0, sizeof(uint32_t));
+    CUDA_CHECK(cudaMemset(blockCodeToIndex.keys, 0xFF, configuration.maxBlocks * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMemset(nextBlockIndex, 0, sizeof(uint32_t)));
 
-    rebuildMappingKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, particleCount, blockCodeToIndex, nextBlockIndex, blockCodes, configuration.cellSize);
+    RebuildMappingKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, particleCount, blockCodeToIndex, nextBlockIndex, blockCodes, configuration.cellSize);
 
-    cudaMemset(gridBlocks, 0, maxBlocks * sizeof(GridBlock));
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-    sortParticles(particleBlocks, particleBlocksSortingBuffer, blockCodeToIndex, particleCount, configuration.cellSize, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes);
+    CUDA_CHECK(cudaMemset(gridBlocks, 0, configuration.maxBlocks * sizeof(GridBlock)));
+
+    SortParticles(particleBlocks, particleBlocksSortingBuffer, blockCodeToIndex, particleCount, configuration.cellSize, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes);
+
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+
     std::swap(particleBlocks, particleBlocksSortingBuffer);
 
-    p2gKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, gridBlocks, particleCount, blockCodeToIndex, configuration.cellSize, configuration.deltaTime, configuration.secondLameParameter, configuration.firstLameParameter, configuration.hardeningCoefficient);
+    P2GKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, gridBlocks, particleCount, blockCodeToIndex, configuration.cellSize, configuration.deltaTime, configuration.secondLameParameter, configuration.firstLameParameter, configuration.hardeningCoefficient);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-    const int totalNodes = maxBlocks * nodesPerBlock;
+    const int totalNodes = configuration.maxBlocks * nodesPerBlock;
     const int gridLaunchBlocks = (totalNodes + threadsPerBlock - 1) / threadsPerBlock;
-    updateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, maxBlocks, configuration.deltaTime, configuration.gravity, configuration.cellSize, configuration.cellCountPerAxis);
+    updateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, configuration.maxBlocks, configuration.deltaTime, configuration.gravity, configuration.cellSize, configuration.cellCountPerAxis);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
 
     g2pKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, gridBlocks, particleCount, blockCodeToIndex, configuration.cellSize, configuration.deltaTime, configuration.criticalCompression, configuration.criticalStretch);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
 }
 
 void Simulation::copyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const

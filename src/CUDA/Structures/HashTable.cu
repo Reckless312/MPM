@@ -1,15 +1,15 @@
 #include "HashTable.h"
 #include <cuda_runtime.h>
 
-__device__ uint32_t hashCode(const uint64_t blockCode, const uint32_t capacity)
+__device__ uint32_t HashCode(const uint64_t blockCode, const uint32_t capacity)
 {
     const uint64_t hashCode = (blockCode ^ (blockCode >> 30)) * 0xbf58476d1ce4e5b9ULL;
     return static_cast<uint32_t>(hashCode % capacity);
 }
 
-__device__ void insert(const HashTable& table, const uint64_t blockCode, uint32_t* nextBlockIndex, uint64_t* blockCodes)
+__device__ void Insert(const HashTable& table, const uint64_t blockCode, uint32_t* nextBlockIndex, uint64_t* blockCodes)
 {
-    uint32_t slot = hashCode(blockCode, table.capacity);
+    uint32_t slot = HashCode(blockCode, table.capacity);
 
     while (true)
     {
@@ -33,9 +33,9 @@ __device__ void insert(const HashTable& table, const uint64_t blockCode, uint32_
     }
 }
 
-__device__ uint32_t lookup(const HashTable& table, const uint64_t blockCode)
+__device__ uint32_t Lookup(const HashTable& table, const uint64_t blockCode)
 {
-    uint32_t slot = hashCode(blockCode, table.capacity);
+    uint32_t slot = HashCode(blockCode, table.capacity);
 
     while (true)
     {

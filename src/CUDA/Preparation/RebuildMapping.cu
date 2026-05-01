@@ -1,8 +1,8 @@
 #include "RebuildMapping.h"
-#include "Morton.h"
+#include "../Structures/Morton.h"
 #include <cuda_runtime.h>
 
-__global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, uint64_t* blockCodes, const float cellSize)
+__global__ void RebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, uint32_t* nextBlockIndex, uint64_t* blockCodes, const float cellSize)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -28,9 +28,9 @@ __global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const 
     const int cellY = static_cast<int>(floorf(gridPositionY - freeZoneShift));
     const int cellZ = static_cast<int>(floorf(gridPositionZ - freeZoneShift));
 
-    const int blockX = cellX >> 3;
-    const int blockY = cellY >> 3;
-    const int blockZ = cellZ >> 3;
+    const int blockX = cellX / blockSize;
+    const int blockY = cellY / blockSize;
+    const int blockZ = cellZ / blockSize;
 
     for (int offsetX = -1; offsetX <= 1; offsetX++)
     {
@@ -38,8 +38,8 @@ __global__ void rebuildMappingKernel(const ParticleBlock* particleBlocks, const 
         {
             for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
             {
-                const uint64_t neighborBlockCode = mortonEncode(blockX + offsetX, blockY + offsetY, blockZ + offsetZ);
-                insert(hashTable, neighborBlockCode, nextBlockIndex, blockCodes);
+                const uint64_t neighborBlockCode = MortonEncode(blockX + offsetX, blockY + offsetY, blockZ + offsetZ);
+                Insert(hashTable, neighborBlockCode, nextBlockIndex, blockCodes);
             }
         }
     }

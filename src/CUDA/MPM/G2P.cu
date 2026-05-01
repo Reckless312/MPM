@@ -1,7 +1,7 @@
 #include "G2P.h"
 #include "P2G.h"
-#include "RebuildMapping.h"
-#include "Morton.h"
+#include "../Preparation/RebuildMapping.h"
+#include "../Structures/Morton.h"
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
@@ -42,7 +42,7 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float fractionalZ = gridPositionZ - static_cast<float>(baseZ);
 
     float weightsX[3], weightsY[3], weightsZ[3];
-    computeBSplineWeights(fractionalX, fractionalY, fractionalZ, weightsX, weightsY, weightsZ);
+    ComputeBSplineWeights(fractionalX, fractionalY, fractionalZ, weightsX, weightsY, weightsZ);
 
     float newVelocityX = 0.0f, newVelocityY = 0.0f, newVelocityZ = 0.0f;
     float bMatrix[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
@@ -63,21 +63,21 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const float nodeToParticleOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
                 const float nodeToParticleOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
 
-                const int nodeBlockX = nodeX >> 3;
-                const int nodeBlockY = nodeY >> 3;
-                const int nodeBlockZ = nodeZ >> 3;
+                const int nodeBlockX = nodeX / blockSize;
+                const int nodeBlockY = nodeY / blockSize;
+                const int nodeBlockZ = nodeZ / blockSize;
 
-                const uint64_t blockCode = mortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = lookup(hashTable, blockCode);
+                const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
+                const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
                 if (blockIndex == UINT32_MAX)
                 {
                     continue;
                 }
 
-                const auto localX = static_cast<uint32_t>(nodeX & 7);
-                const auto localY = static_cast<uint32_t>(nodeY & 7);
-                const auto localZ = static_cast<uint32_t>(nodeZ & 7);
+                const auto localX = static_cast<uint32_t>(nodeX % blockSize);
+                const auto localY = static_cast<uint32_t>(nodeY % blockSize);
+                const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
                 const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
 
                 const float gridVelocityX = gridBlocks[blockIndex].velocityX[nodeLane];

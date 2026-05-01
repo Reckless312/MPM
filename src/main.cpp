@@ -52,8 +52,6 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Configuration snowConfiguration;
-
     Snowball snowballInformation;
 
     try
@@ -66,8 +64,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Simulation simulation(snowballInformation.particleCount, snowConfiguration, snowballInformation.initialBlocks.data(),
-        static_cast<int>(snowballInformation.initialBlocks.size()));
+    Simulation simulation(snowballInformation.particleCount, snowballInformation.initialBlocks.data(), static_cast<int>(snowballInformation.initialBlocks.size()));
 
     Particle snowball(snowballInformation.initialPositions);
 
@@ -87,10 +84,11 @@ int main()
         program.ProcessInput();
         camera.ProcessInput();
 
-        for (int step = 0; step < 10; step++)
+        for (int step = 0; step < 5; step++)
         {
-            simulation.step();
+            simulation.Step();
         }
+
         simulation.copyPositionsToHost(positionsX.data(), positionsY.data(), positionsZ.data());
 
         for (int particleIndex = 0; particleIndex < snowballInformation.particleCount; particleIndex++)
