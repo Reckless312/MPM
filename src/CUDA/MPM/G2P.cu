@@ -8,7 +8,7 @@
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
-__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch)
+__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -25,6 +25,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
     float deformationGradient[9];
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
@@ -44,23 +45,43 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float fractionalY = gridPositionY - static_cast<float>(baseY);
     const float fractionalZ = gridPositionZ - static_cast<float>(baseZ);
 
+    extern __shared__ float sharedWeights[];
+
+    const int weightStride = static_cast<int>(blockDim.x);
+    const int threadOffset = static_cast<int>(threadIdx.x);
+
     float weightsX[3], weightsY[3], weightsZ[3];
     ComputeBSplineWeights(fractionalX, fractionalY, fractionalZ, weightsX, weightsY, weightsZ);
+
+    sharedWeights[0 * weightStride + threadOffset] = weightsX[0];
+    sharedWeights[1 * weightStride + threadOffset] = weightsX[1];
+    sharedWeights[2 * weightStride + threadOffset] = weightsX[2];
+    sharedWeights[3 * weightStride + threadOffset] = weightsY[0];
+    sharedWeights[4 * weightStride + threadOffset] = weightsY[1];
+    sharedWeights[5 * weightStride + threadOffset] = weightsY[2];
+    sharedWeights[6 * weightStride + threadOffset] = weightsZ[0];
+    sharedWeights[7 * weightStride + threadOffset] = weightsZ[1];
+    sharedWeights[8 * weightStride + threadOffset] = weightsZ[2];
 
     float newVelocityX = 0.0f, newVelocityY = 0.0f, newVelocityZ = 0.0f;
     float bMatrix[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
+    #pragma unroll
     for (int neighborX = 0; neighborX < 3; neighborX++)
     {
+        #pragma unroll
         for (int neighborY = 0; neighborY < 3; neighborY++)
         {
+            #pragma unroll
             for (int neighborZ = 0; neighborZ < 3; neighborZ++)
             {
                 const int nodeX = baseX + neighborX;
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
-                const float weight = weightsX[neighborX] * weightsY[neighborY] * weightsZ[neighborZ];
+                const float weight = sharedWeights[neighborX * weightStride + threadOffset] *
+                                     sharedWeights[(3 + neighborY) * weightStride + threadOffset] *
+                                     sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
                 const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
                 const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
@@ -106,19 +127,22 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     float velocityGradient[9];
 
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         velocityGradient[componentIndex] = velocityGradientScale * bMatrix[componentIndex];
     }
 
-    // F_new = (I + dt * C) * F_old
     float newDeformationGradient[9];
+    #pragma unroll
     for (int row = 0; row < 3; row++)
     {
+        #pragma unroll
         for (int col = 0; col < 3; col++)
         {
             float value = deformationGradient[row * 3 + col];
 
+            #pragma unroll
             for (int k = 0; k < 3; k++)
             {
                 value += deltaTime * velocityGradient[row * 3 + k] * deformationGradient[k * 3 + col];
@@ -160,14 +184,39 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     const float newPlasticVolume = oldPlasticVolume * detFNew / detFElastic;
 
-    particleBlocks[particleBlockIndex].positionX[lane] = positionX + deltaTime * newVelocityX;
-    particleBlocks[particleBlockIndex].positionY[lane] = positionY + deltaTime * newVelocityY;
-    particleBlocks[particleBlockIndex].positionZ[lane] = positionZ + deltaTime * newVelocityZ;
+    const float newPositionX = positionX + deltaTime * newVelocityX;
+    const float newPositionY = positionY + deltaTime * newVelocityY;
+    const float newPositionZ = positionZ + deltaTime * newVelocityZ;
+
+    const float newGridPositionX = newPositionX * inverseCellSize;
+    const float newGridPositionY = newPositionY * inverseCellSize;
+    const float newGridPositionZ = newPositionZ * inverseCellSize;
+
+    const int newCellX = static_cast<int>(floorf(newGridPositionX - freeZoneShift));
+    const int newCellY = static_cast<int>(floorf(newGridPositionY - freeZoneShift));
+    const int newCellZ = static_cast<int>(floorf(newGridPositionZ - freeZoneShift));
+
+    int homeBlockX, homeBlockY, homeBlockZ;
+    MortonDecode(particleHomeBlockCodes[particleIndex], homeBlockX, homeBlockY, homeBlockZ);
+
+    const bool outsideX = newCellX < (homeBlockX - 1) * blockSize || newCellX > (homeBlockX + 2) * blockSize - 3;
+    const bool outsideY = newCellY < (homeBlockY - 1) * blockSize || newCellY > (homeBlockY + 2) * blockSize - 3;
+    const bool outsideZ = newCellZ < (homeBlockZ - 1) * blockSize || newCellZ > (homeBlockZ + 2) * blockSize - 3;
+
+    if (outsideX || outsideY || outsideZ)
+    {
+        atomicExch(rebuildFlag, 1u);
+    }
+
+    particleBlocks[particleBlockIndex].positionX[lane] = newPositionX;
+    particleBlocks[particleBlockIndex].positionY[lane] = newPositionY;
+    particleBlocks[particleBlockIndex].positionZ[lane] = newPositionZ;
 
     particleBlocks[particleBlockIndex].velocityX[lane] = newVelocityX;
     particleBlocks[particleBlockIndex].velocityY[lane] = newVelocityY;
     particleBlocks[particleBlockIndex].velocityZ[lane] = newVelocityZ;
 
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = velocityGradient[componentIndex];

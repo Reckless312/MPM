@@ -3,7 +3,7 @@
 #include "../Preparation/RebuildMapping.h"
 #include <cuda_runtime.h>
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells)
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -40,19 +40,59 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
 
     velocityY -= gravity * deltaTime;
 
-    if (nodeGridX < 2 || nodeGridX >= gridSizeInCells - 2)
+    const float tangentialScale = 1.0f - boundaryFriction;
+
+    if (nodeGridX < 2 && velocityX < 0.0f)
     {
         velocityX = 0.0f;
+        velocityY *= tangentialScale;
+        velocityZ *= tangentialScale;
     }
-
-    if (nodeGridY < 2 || nodeGridY >= gridSizeInCells - 2)
+    else if (nodeGridX >= gridSizeInCells - 2 && velocityX > 0.0f)
     {
-        velocityY = 0.0f;
+        velocityX = 0.0f;
+        velocityY *= tangentialScale;
+        velocityZ *= tangentialScale;
     }
 
-    if (nodeGridZ < 2 || nodeGridZ >= gridSizeInCells - 2)
+    if (nodeGridY < 2)
+    {
+        if (velocityY < 0.0f)
+        {
+            velocityX *= tangentialScale;
+            velocityZ *= tangentialScale;
+            velocityY = 0.0f;
+        }
+        else
+        {
+            velocityY *= tangentialScale;
+        }
+    }
+    else if (nodeGridY >= gridSizeInCells - 2)
+    {
+        if (velocityY > 0.0f)
+        {
+            velocityX *= tangentialScale;
+            velocityZ *= tangentialScale;
+            velocityY = 0.0f;
+        }
+        else
+        {
+            velocityY *= tangentialScale;
+        }
+    }
+
+    if (nodeGridZ < 2 && velocityZ < 0.0f)
     {
         velocityZ = 0.0f;
+        velocityX *= tangentialScale;
+        velocityY *= tangentialScale;
+    }
+    else if (nodeGridZ >= gridSizeInCells - 2 && velocityZ > 0.0f)
+    {
+        velocityZ = 0.0f;
+        velocityX *= tangentialScale;
+        velocityY *= tangentialScale;
     }
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;

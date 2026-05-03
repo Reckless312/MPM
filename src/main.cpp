@@ -92,7 +92,7 @@ int main()
         program.ProcessInput();
         camera.ProcessInput();
 
-        for (int step = 0; step < 5; step++)
+        for (int step = 0; step < 7; step++)
         {
             simulation.Step();
         }
