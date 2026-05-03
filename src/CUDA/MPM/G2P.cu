@@ -25,7 +25,6 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
     float deformationGradient[9];
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
@@ -66,13 +65,10 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     float newVelocityX = 0.0f, newVelocityY = 0.0f, newVelocityZ = 0.0f;
     float bMatrix[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
-    #pragma unroll
     for (int neighborX = 0; neighborX < 3; neighborX++)
     {
-        #pragma unroll
         for (int neighborY = 0; neighborY < 3; neighborY++)
         {
-            #pragma unroll
             for (int neighborZ = 0; neighborZ < 3; neighborZ++)
             {
                 const int nodeX = baseX + neighborX;
@@ -127,22 +123,18 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     float velocityGradient[9];
 
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         velocityGradient[componentIndex] = velocityGradientScale * bMatrix[componentIndex];
     }
 
     float newDeformationGradient[9];
-    #pragma unroll
     for (int row = 0; row < 3; row++)
     {
-        #pragma unroll
         for (int col = 0; col < 3; col++)
         {
             float value = deformationGradient[row * 3 + col];
 
-            #pragma unroll
             for (int k = 0; k < 3; k++)
             {
                 value += deltaTime * velocityGradient[row * 3 + k] * deformationGradient[k * 3 + col];
@@ -216,7 +208,6 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     particleBlocks[particleBlockIndex].velocityY[lane] = newVelocityY;
     particleBlocks[particleBlockIndex].velocityZ[lane] = newVelocityZ;
 
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = velocityGradient[componentIndex];

@@ -72,7 +72,6 @@ __global__ void ReorderParticlesKernel(const ParticleBlock* inputBlocks, Particl
     outputBlocks[newParticleBlockIndex].velocityY[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityY[oldParticleLane];
     outputBlocks[newParticleBlockIndex].velocityZ[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityZ[oldParticleLane];
 
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         outputBlocks[newParticleBlockIndex].deformationGradient[componentIndex][newParticleLane] = inputBlocks[oldParticleBlockIndex].deformationGradient[componentIndex][oldParticleLane];
@@ -174,7 +173,6 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     float deformationGradient[9];
     float affineMomentumMatrix[9];
 
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
@@ -197,7 +195,6 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(0xFFFFFFFF, velocityY, static_cast<int>(sourceLane));
     particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(0xFFFFFFFF, velocityZ, static_cast<int>(sourceLane));
 
-    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = __shfl_sync(0xFFFFFFFF, deformationGradient[componentIndex], static_cast<int>(sourceLane));

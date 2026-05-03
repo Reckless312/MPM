@@ -64,17 +64,11 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Simulation simulation(snowballInformation.particleCount, snowballInformation.initialBlocks.data(), static_cast<int>(snowballInformation.initialBlocks.size()));
-
     Particle snowball(snowballInformation.initialPositions);
 
+    Simulation simulation(snowballInformation.particleCount, snowballInformation.initialBlocks.data(), static_cast<int>(snowballInformation.initialBlocks.size()), snowball.GetVBO());
+
     glEnable(GL_DEPTH_TEST);
-
-    std::vector<float> positionsX(snowballInformation.particleCount);
-    std::vector<float> positionsY(snowballInformation.particleCount);
-    std::vector<float> positionsZ(snowballInformation.particleCount);
-
-    std::vector<glm::vec3> positions(snowballInformation.particleCount);
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -92,19 +86,12 @@ int main()
         program.ProcessInput();
         camera.ProcessInput();
 
-        for (int step = 0; step < 7; step++)
+        for (int step = 0; step < 5; step++)
         {
             simulation.Step();
         }
 
-        simulation.CopyPositionsToHost(positionsX.data(), positionsY.data(), positionsZ.data());
-
-        for (int particleIndex = 0; particleIndex < snowballInformation.particleCount; particleIndex++)
-        {
-            positions[particleIndex] = glm::vec3(positionsX[particleIndex], positionsY[particleIndex], positionsZ[particleIndex]);
-        }
-
-        snowball.Update(positions);
+        simulation.SyncPositionsToVBO();
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

@@ -14,6 +14,8 @@ Program::~Program()
 
 void Program::InitializeGLFW()
 {
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+
     if (const int isInitialized = glfwInit(); isInitialized != GLFW_TRUE)
     {
         throw MPMException("Failed to initialize GLFW.", Error::GLFWInitialization);

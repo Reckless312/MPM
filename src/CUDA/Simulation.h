@@ -9,13 +9,15 @@
 #include "Structures/HashTable.h"
 #include "OpenGL/Simulation/Configuration.h"
 
+struct cudaGraphicsResource;
+
 class Simulation
 {
 public:
-    Simulation(int particleCount, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
+    Simulation(int particleCount, const ParticleBlock* initialParticleBlocks, int particleBlockCount, unsigned int vbo);
     ~Simulation();
     void Step();
-    void CopyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const;
+    void SyncPositionsToVBO();
 
 private:
     int particleCount;
@@ -42,7 +44,7 @@ private:
 
     size_t nvidiaCUBTemporaryStorageBytes = 0;
 
-    ParticleBlock* hostParticleBlocks{};
+    cudaGraphicsResource* vboResource{};
 
     const int threadsPerBlock = 128;
 
