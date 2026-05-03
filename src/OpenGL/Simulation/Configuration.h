@@ -14,6 +14,7 @@ public:
     float hardeningCoefficient = 10.0f;
     float criticalCompression = 0.025f;
     float criticalStretch = 0.0075f;
+    float boundaryFriction = 0.8f;
 };
 
 #endif

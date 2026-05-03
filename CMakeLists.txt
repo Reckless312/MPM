@@ -52,6 +52,8 @@ add_executable(MPM_Method ${SOURCE_FILES})
 set_target_properties(MPM_Method PROPERTIES
         CUDA_SEPARABLE_COMPILATION ON)
 
+target_compile_options(MPM_Method PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-use_fast_math>)
+
 target_include_directories(MPM_Method PUBLIC src src/Libraries/include)
 
 target_compile_definitions(MPM_Method PRIVATE

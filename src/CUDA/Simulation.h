@@ -44,7 +44,7 @@ private:
 
     ParticleBlock* hostParticleBlocks{};
 
-    const int threadsPerBlock = 256;
+    const int threadsPerBlock = 128;
 
     int stepsSinceLastRebuild = 0;
 };
