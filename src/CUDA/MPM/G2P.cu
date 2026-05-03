@@ -1,11 +1,14 @@
 #include "G2P.h"
+
+#include <cstdio>
+
 #include "P2G.h"
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
-__global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch)
+__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -59,9 +62,9 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
                 const float weight = weightsX[neighborX] * weightsY[neighborY] * weightsZ[neighborZ];
 
-                const float nodeToParticleOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
-                const float nodeToParticleOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
-                const float nodeToParticleOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
+                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
+                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
+                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
 
                 const int nodeBlockX = nodeX / blockSize;
                 const int nodeBlockY = nodeY / blockSize;
@@ -70,14 +73,10 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
                 const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
-                if (blockIndex == UINT32_MAX)
-                {
-                    continue;
-                }
-
                 const auto localX = static_cast<uint32_t>(nodeX % blockSize);
                 const auto localY = static_cast<uint32_t>(nodeY % blockSize);
                 const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
+
                 const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
 
                 const float gridVelocityX = gridBlocks[blockIndex].velocityX[nodeLane];
@@ -88,30 +87,31 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 newVelocityY += weight * gridVelocityY;
                 newVelocityZ += weight * gridVelocityZ;
 
-                // B matrix: outer product of grid velocity and node-to-particle offset
-                bMatrix[0] += weight * gridVelocityX * nodeToParticleOffsetX;
-                bMatrix[1] += weight * gridVelocityX * nodeToParticleOffsetY;
-                bMatrix[2] += weight * gridVelocityX * nodeToParticleOffsetZ;
-                bMatrix[3] += weight * gridVelocityY * nodeToParticleOffsetX;
-                bMatrix[4] += weight * gridVelocityY * nodeToParticleOffsetY;
-                bMatrix[5] += weight * gridVelocityY * nodeToParticleOffsetZ;
-                bMatrix[6] += weight * gridVelocityZ * nodeToParticleOffsetX;
-                bMatrix[7] += weight * gridVelocityZ * nodeToParticleOffsetY;
-                bMatrix[8] += weight * gridVelocityZ * nodeToParticleOffsetZ;
+                // Eq. 176
+                bMatrix[0] += weight * gridVelocityX * particleToNodeOffsetX;
+                bMatrix[1] += weight * gridVelocityX * particleToNodeOffsetY;
+                bMatrix[2] += weight * gridVelocityX * particleToNodeOffsetZ;
+                bMatrix[3] += weight * gridVelocityY * particleToNodeOffsetX;
+                bMatrix[4] += weight * gridVelocityY * particleToNodeOffsetY;
+                bMatrix[5] += weight * gridVelocityY * particleToNodeOffsetZ;
+                bMatrix[6] += weight * gridVelocityZ * particleToNodeOffsetX;
+                bMatrix[7] += weight * gridVelocityZ * particleToNodeOffsetY;
+                bMatrix[8] += weight * gridVelocityZ * particleToNodeOffsetZ;
             }
         }
     }
 
-    // Velocity gradient: C = 4/dx^2 * B
+    // C = 4/dx^2 * B
     const float velocityGradientScale = 4.0f * inverseCellSize * inverseCellSize;
 
     float velocityGradient[9];
+
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         velocityGradient[componentIndex] = velocityGradientScale * bMatrix[componentIndex];
     }
 
-    // Deformation gradient update: F_new = (I + dt * C) * F_old
+    // F_new = (I + dt * C) * F_old
     float newDeformationGradient[9];
     for (int row = 0; row < 3; row++)
     {
@@ -128,7 +128,6 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
         }
     }
 
-    // Plasticity projection: SVD of F_new, clamp singular values, reconstruct F_E
     float u11, u12, u13, u21, u22, u23, u31, u32, u33;
     float s11, s22, s33;
     float v11, v12, v13, v21, v22, v23, v31, v32, v33;
@@ -144,7 +143,6 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float clampedS22 = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s22));
     const float clampedS33 = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s33));
 
-    // F_E = U * S_clamped * V^T
     const float elasticDeformationGradient00 = u11*clampedS11*v11 + u12*clampedS22*v12 + u13*clampedS33*v13;
     const float elasticDeformationGradient01 = u11*clampedS11*v21 + u12*clampedS22*v22 + u13*clampedS33*v23;
     const float elasticDeformationGradient02 = u11*clampedS11*v31 + u12*clampedS22*v32 + u13*clampedS33*v33;
@@ -155,13 +153,13 @@ __global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float elasticDeformationGradient21 = u31*clampedS11*v21 + u32*clampedS22*v22 + u33*clampedS33*v23;
     const float elasticDeformationGradient22 = u31*clampedS11*v31 + u32*clampedS22*v32 + u33*clampedS33*v33;
 
-    // J_P update: J_P_new = J_P_old * det(F_new) / det(F_E_new)
     const float oldPlasticVolume = particleBlocks[particleBlockIndex].plasticVolume[lane];
+
     const float detFNew = s11 * s22 * s33;
     const float detFElastic = clampedS11 * clampedS22 * clampedS33;
+
     const float newPlasticVolume = oldPlasticVolume * detFNew / detFElastic;
 
-    // Write back
     particleBlocks[particleBlockIndex].positionX[lane] = positionX + deltaTime * newVelocityX;
     particleBlocks[particleBlockIndex].positionY[lane] = positionY + deltaTime * newVelocityY;
     particleBlocks[particleBlockIndex].positionZ[lane] = positionZ + deltaTime * newVelocityZ;

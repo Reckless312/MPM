@@ -15,8 +15,7 @@ public:
     Simulation(int particleCount, const ParticleBlock* initialParticleBlocks, int particleBlockCount);
     ~Simulation();
     void Step();
-    void copyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const;
-    [[nodiscard]] const ParticleBlock* getParticleBlocks() const;
+    void CopyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const;
 
 private:
     int particleCount;
@@ -36,6 +35,9 @@ private:
     uint32_t* particleIndices{};
     uint32_t* sortedParticleIndices{};
 
+    uint64_t* particleHomeBlockCodes{};
+    uint32_t* rebuildFlag{};
+
     void* nvidiaCUBTemporaryStorage = nullptr;
 
     size_t nvidiaCUBTemporaryStorageBytes = 0;
@@ -43,6 +45,8 @@ private:
     ParticleBlock* hostParticleBlocks{};
 
     const int threadsPerBlock = 256;
+
+    int stepsSinceLastRebuild = 0;
 };
 
 #endif

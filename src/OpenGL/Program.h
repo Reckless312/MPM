@@ -23,6 +23,8 @@ public:
     static constexpr GLsizei windowWidth = 800;
     static constexpr GLsizei windowHeight = 600;
 
+    inline static const char* windowTitle = "MPM Snow Simulation";
+
     static constexpr float pi = 3.14159265f;
 
     explicit Program();
@@ -46,8 +48,6 @@ private:
     static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
 
     static constexpr int failureCode = 1;
-
-    inline static const char* windowTitle = "MPM Snow Simulation";
 
     static constexpr GLFWmonitor* fullscreenMonitor = nullptr;
     static constexpr GLFWwindow* windowToShareResources = nullptr;

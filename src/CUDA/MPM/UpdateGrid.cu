@@ -3,7 +3,7 @@
 #include "../Preparation/RebuildMapping.h"
 #include <cuda_runtime.h>
 
-__global__ void updateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const float cellSize, const int gridSizeInCells)
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -23,6 +23,7 @@ __global__ void updateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCod
     }
 
     int blockX, blockY, blockZ;
+
     MortonDecode(blockCodes[gridBlockIndex], blockX, blockY, blockZ);
 
     const int localX = nodeLane % blockSize;

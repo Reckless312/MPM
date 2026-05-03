@@ -6,7 +6,7 @@
 #include "../Structures/HashTable.h"
 
 #ifdef __CUDACC__
-__global__ void g2pKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, int particleCount, const HashTable& hashTable, float cellSize, float deltaTime, float criticalCompression, float criticalStretch);
+__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, int particleCount, const HashTable& hashTable, float cellSize, float deltaTime, float criticalCompression, float criticalStretch);
 #endif
 
 #endif

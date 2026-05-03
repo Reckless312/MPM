@@ -4,7 +4,7 @@
 class Configuration
 {
 public:
-    int maxBlocks = 4096;
+    int maxBlocks = 16384;
     int cellCountPerAxis = 256;
     float cellSize = 0.02f;
     float deltaTime = 2e-4f;

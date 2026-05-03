@@ -79,6 +79,14 @@ int main()
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
+
+        if (program.deltaTime > 0.0f)
+        {
+            const int fps = static_cast<int>(1.0f / program.deltaTime);
+            const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
+            glfwSetWindowTitle(program.window, title.c_str());
+        }
+
         camera.UpdateSpeed(program.deltaTime);
 
         program.ProcessInput();
@@ -89,7 +97,7 @@ int main()
             simulation.Step();
         }
 
-        simulation.copyPositionsToHost(positionsX.data(), positionsY.data(), positionsZ.data());
+        simulation.CopyPositionsToHost(positionsX.data(), positionsY.data(), positionsZ.data());
 
         for (int particleIndex = 0; particleIndex < snowballInformation.particleCount; particleIndex++)
         {
