@@ -7,10 +7,29 @@
 #include "MPM/UpdateGrid.h"
 #include "MPM/G2P.h"
 #include <cuda_runtime.h>
+#include <glad/glad.h>
+#include <cuda_gl_interop.h>
 #include <cub/cub.cuh>
 #include <utility>
 
-Simulation::Simulation(const int particleCount, const ParticleBlock* initialParticleBlocks, const int particleBlockCount)
+__global__ void WritePositionsKernel(const ParticleBlock* particleBlocks, float* buffer, const int particleCount)
+{
+    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+
+    if (particleIndex >= particleCount)
+    {
+        return;
+    }
+
+    const int particleBlockIndex = particleIndex / 32;
+    const int lane = particleIndex % 32;
+
+    buffer[particleIndex * 3 + 0] = particleBlocks[particleBlockIndex].positionX[lane];
+    buffer[particleIndex * 3 + 1] = particleBlocks[particleBlockIndex].positionY[lane];
+    buffer[particleIndex * 3 + 2] = particleBlocks[particleBlockIndex].positionZ[lane];
+}
+
+Simulation::Simulation(const int particleCount, const ParticleBlock* initialParticleBlocks, const int particleBlockCount, const unsigned int vbo)
 {
     this->particleCount = particleCount;
 
@@ -37,15 +56,14 @@ Simulation::Simulation(const int particleCount, const ParticleBlock* initialPart
     CUDA_CHECK(cudaMemset(particleHomeBlockCodes, 0xFF, particleCount * sizeof(uint64_t)));
 
     CUDA_CHECK(cudaMalloc(&rebuildFlag, sizeof(uint32_t)));
-    const uint32_t initialRebuildFlag = 1u;
+    constexpr uint32_t initialRebuildFlag = 1u;
     CUDA_CHECK(cudaMemcpy(rebuildFlag, &initialRebuildFlag, sizeof(uint32_t), cudaMemcpyHostToDevice));
 
     CUDA_CHECK(cub::DeviceRadixSort::SortPairs(nullptr, nvidiaCUBTemporaryStorageBytes, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, particleCount));
 
     CUDA_CHECK(cudaMalloc(&nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes));
 
-    const int blockCount = (particleCount + 31) / 32;
-    CUDA_CHECK(cudaMallocHost(&hostParticleBlocks, blockCount * sizeof(ParticleBlock)));
+    CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&vboResource, vbo, cudaGraphicsMapFlagsWriteDiscard));
 }
 
 Simulation::~Simulation()
@@ -64,7 +82,7 @@ Simulation::~Simulation()
     cudaFree(particleHomeBlockCodes);
     cudaFree(rebuildFlag);
     cudaFree(nvidiaCUBTemporaryStorage);
-    cudaFreeHost(hostParticleBlocks);
+    cudaGraphicsUnregisterResource(vboResource);
 }
 
 void Simulation::Step()
@@ -122,20 +140,18 @@ void Simulation::Step()
     CUDA_CHECK(cudaDeviceSynchronize());
 }
 
-void Simulation::CopyPositionsToHost(float* positionsX, float* positionsY, float* positionsZ) const
+void Simulation::SyncPositionsToVBO()
 {
-    const int particleCount = this->particleCount;
-    const int blockCount = (particleCount + 31) / 32;
+    size_t bufferSize;
+    float* deviceBuffer;
 
-    CUDA_CHECK(cudaMemcpy(hostParticleBlocks, particleBlocks, blockCount * sizeof(ParticleBlock), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaGraphicsMapResources(1, &vboResource));
+    CUDA_CHECK(cudaGraphicsResourceGetMappedPointer(reinterpret_cast<void**>(&deviceBuffer), &bufferSize, vboResource));
 
-    for (int particleIndex = 0; particleIndex < particleCount; particleIndex++)
-    {
-        const int blockIndex = particleIndex / 32;
-        const int lane = particleIndex % 32;
+    const int launchBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
+    WritePositionsKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, deviceBuffer, particleCount);
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
 
-        positionsX[particleIndex] = hostParticleBlocks[blockIndex].positionX[lane];
-        positionsY[particleIndex] = hostParticleBlocks[blockIndex].positionY[lane];
-        positionsZ[particleIndex] = hostParticleBlocks[blockIndex].positionZ[lane];
-    }
+    CUDA_CHECK(cudaGraphicsUnmapResources(1, &vboResource));
 }

@@ -12,6 +12,8 @@ public:
         glDeleteBuffers(1, &VBO);
     }
 
+    unsigned int GetVBO() const { return VBO; }
+
     virtual void Draw(const Shader &shader) const = 0;
 
 protected:
