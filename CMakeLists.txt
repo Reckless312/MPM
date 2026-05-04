@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 4.1)
+set(CMAKE_CUDA_HOST_COMPILER /usr/bin/gcc-15)
 project(MPM_Method LANGUAGES C CXX CUDA)
 
 set(CMAKE_CUDA_STANDARD 20)
@@ -41,9 +42,13 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/MPM/G2P.cu
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
+        src/CUDA/MeshBoundary.h
+        src/CUDA/MeshBoundary.cpp
         src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/Snowball.cpp
         src/OpenGL/Simulation/Snowball.h
+        src/OpenGL/Simulation/Snowfall.cpp
+        src/OpenGL/Simulation/Snowfall.h
         src/OpenGL/Simulation/Configuration.h
 )
 

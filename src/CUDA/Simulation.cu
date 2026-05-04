@@ -64,6 +64,10 @@ Simulation::Simulation(const int particleCount, const ParticleBlock* initialPart
     CUDA_CHECK(cudaMalloc(&nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes));
 
     CUDA_CHECK(cudaGraphicsGLRegisterBuffer(&vboResource, vbo, cudaGraphicsMapFlagsWriteDiscard));
+
+    const size_t solidCellsSize = configuration.cellCountPerAxis * configuration.cellCountPerAxis * configuration.cellCountPerAxis * sizeof(uint8_t);
+    CUDA_CHECK(cudaMalloc(&solidCells, solidCellsSize));
+    CUDA_CHECK(cudaMemset(solidCells, 0, solidCellsSize));
 }
 
 Simulation::~Simulation()
@@ -82,6 +86,7 @@ Simulation::~Simulation()
     cudaFree(particleHomeBlockCodes);
     cudaFree(rebuildFlag);
     cudaFree(nvidiaCUBTemporaryStorage);
+    cudaFree(solidCells);
     cudaGraphicsUnregisterResource(vboResource);
 }
 
@@ -131,7 +136,7 @@ void Simulation::Step()
     const int totalNodes = configuration.maxBlocks * nodesPerBlock;
     const int gridLaunchBlocks = (totalNodes + threadsPerBlock - 1) / threadsPerBlock;
 
-    UpdateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, configuration.maxBlocks, configuration.deltaTime, configuration.gravity, configuration.cellCountPerAxis, configuration.boundaryFriction);
+    UpdateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, configuration.maxBlocks, configuration.deltaTime, configuration.gravity, configuration.cellCountPerAxis, configuration.boundaryFriction, solidCells);
     CUDA_CHECK(cudaGetLastError());
     CUDA_CHECK(cudaDeviceSynchronize());
 
@@ -154,4 +159,24 @@ void Simulation::SyncPositionsToVBO()
     CUDA_CHECK(cudaDeviceSynchronize());
 
     CUDA_CHECK(cudaGraphicsUnmapResources(1, &vboResource));
+}
+
+void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount)
+{
+    CUDA_CHECK(cudaMemcpy(particleBlocks, initialBlocks, blockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemset(blockCodeToIndex.keys, 0xFF, configuration.maxBlocks * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMemset(nextBlockIndex, 0, sizeof(uint32_t)));
+    CUDA_CHECK(cudaMemset(gridBlocks, 0, configuration.maxBlocks * sizeof(GridBlock)));
+    CUDA_CHECK(cudaMemset(particleHomeBlockCodes, 0xFF, particleCount * sizeof(uint64_t)));
+
+    constexpr uint32_t forceRebuild = 1u;
+    CUDA_CHECK(cudaMemcpy(rebuildFlag, &forceRebuild, sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+    stepsSinceLastRebuild = 0;
+}
+
+void Simulation::UploadMeshBoundary(const std::vector<uint8_t>& solidCellsHost)
+{
+    const size_t solidCellsSize = configuration.cellCountPerAxis * configuration.cellCountPerAxis * configuration.cellCountPerAxis * sizeof(uint8_t);
+    CUDA_CHECK(cudaMemcpy(solidCells, solidCellsHost.data(), solidCellsSize, cudaMemcpyHostToDevice));
 }

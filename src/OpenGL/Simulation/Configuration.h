@@ -12,7 +12,7 @@ public:
     float firstLameParameter = 1.333e4f;
     float secondLameParameter = 2.0e4f;
     float hardeningCoefficient = 10.0f;
-    float criticalCompression = 0.25f;
+    float criticalCompression = 0.025f;
     float criticalStretch = 0.0075f;
     float boundaryFriction = 0.8f;
 };

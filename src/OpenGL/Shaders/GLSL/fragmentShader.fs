@@ -63,6 +63,7 @@ uniform PointLight pointLights[NR_POINT_LIGHTS];
 uniform SpotLight spotLight;
 
 uniform Material material;
+uniform bool hasDiffuseTexture;
 
 vec3 CalculateRegularAmbient(vec3 lightAmbient);
 vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse);
@@ -148,14 +149,28 @@ vec3 CalculateSpotLight(SpotLight light, vec3 normal, vec3 fragmentPosition, vec
 
 vec3 CalculateRegularAmbient(vec3 lightAmbient)
 {
-    return lightAmbient * vec3(texture(material.texture_diffuse1, TextureCoords));
+    vec3 color = vec3(1.0);
+
+    if (hasDiffuseTexture)
+    {
+        color = vec3(texture(material.texture_diffuse1, TextureCoords));
+    }
+
+    return lightAmbient * color;
 }
 
 vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse)
 {
     float diffuseImpact = max(dot(normal, lightDirection), 0.0);
 
-    return lightDiffuse * diffuseImpact * vec3(texture(material.texture_diffuse1, TextureCoords));
+    vec3 color = vec3(1.0);
+
+    if (hasDiffuseTexture)
+    {
+        color = vec3(texture(material.texture_diffuse1, TextureCoords));
+    }
+
+    return lightDiffuse * diffuseImpact * color;
 }
 
 vec3 CalculateRegularSpecular(vec3 normal, vec3 lightDirection, vec3 lightSpecular, vec3 viewDirection)

@@ -40,6 +40,19 @@ void Mesh::Draw(const Shader &shader) const
 
     glActiveTexture(GL_TEXTURE0);
 
+    bool hasDiffuse = false;
+
+    for (const auto& texture : textures)
+    {
+        if (texture.type == "texture_diffuse")
+        {
+            hasDiffuse = true;
+            break;
+        }
+    }
+
+    shader.SetBool("hasDiffuseTexture", hasDiffuse);
+
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);

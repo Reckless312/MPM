@@ -1,5 +1,9 @@
 #include "Model.h"
 
+#include <array>
+
+#include <glm/vec4.hpp>
+
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 #include "../Shaders/TextureLoader.h"
@@ -108,6 +112,25 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
     this->meshes.emplace_back(vertices, indices, textures);
+}
+
+std::vector<std::array<glm::vec3, 3>> Model::GetTriangles(const glm::mat4& modelMatrix) const
+{
+    std::vector<std::array<glm::vec3, 3>> triangles;
+
+    for (const auto& mesh : this->meshes)
+    {
+        for (size_t i = 0; i < mesh.indices.size(); i += 3)
+        {
+            glm::vec3 v0 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i    ]].Position, 1.0f));
+            glm::vec3 v1 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i + 1]].Position, 1.0f));
+            glm::vec3 v2 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i + 2]].Position, 1.0f));
+
+            triangles.push_back({v0, v1, v2});
+        }
+    }
+
+    return triangles;
 }
 
 std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *material, const aiTextureType type, const std::string &typeName)

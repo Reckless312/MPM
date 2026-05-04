@@ -3,7 +3,7 @@
 #include "../Preparation/RebuildMapping.h"
 #include <cuda_runtime.h>
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction)
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction, const uint8_t* solidCells)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -93,6 +93,13 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
         velocityZ = 0.0f;
         velocityX *= tangentialScale;
         velocityY *= tangentialScale;
+    }
+
+    if (solidCells[nodeGridZ * gridSizeInCells * gridSizeInCells + nodeGridY * gridSizeInCells + nodeGridX])
+    {
+        velocityX = 0.0f;
+        velocityY = 0.0f;
+        velocityZ = 0.0f;
     }
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;
