@@ -35,6 +35,14 @@ void Camera::UpdateSpeed(const float deltaTime)
     this->speed = this->speedMultiplier * deltaTime;
 }
 
+void Camera::SetInitialOrientation(glm::vec3 position, float yaw, float pitch)
+{
+    this->position = position;
+    this->yaw = yaw;
+    this->pitch = pitch;
+    this->UpdateDirection();
+}
+
 void Camera::UpdateDirection()
 {
     this->direction.x = static_cast<float>(cos(glm::radians(yaw)) * cos(glm::radians(pitch)));

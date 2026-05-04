@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <vector>
 
 #include "Structures/ParticleBuffer.h"
 #include "Structures/GridBuffer.h"
@@ -18,6 +19,8 @@ public:
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
+    void UploadMeshBoundary(const std::vector<uint8_t>& solidCells);
+    void Reset(const ParticleBlock* initialBlocks, int blockCount);
 
 private:
     int particleCount;
@@ -45,6 +48,7 @@ private:
     size_t nvidiaCUBTemporaryStorageBytes = 0;
 
     cudaGraphicsResource* vboResource{};
+    uint8_t* solidCells{};
 
     const int threadsPerBlock = 128;
 

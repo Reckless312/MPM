@@ -16,6 +16,7 @@ public:
     explicit Camera(GLFWwindow* window, GLsizei windowWidth, GLsizei windowHeight);
 
     void UpdateSpeed(float deltaTime);
+    void SetInitialOrientation(glm::vec3 position, float yaw, float pitch);
 
     void AssignUserPointerAndSetCallbacks();
     void ProcessInput();

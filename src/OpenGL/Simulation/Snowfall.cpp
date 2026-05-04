@@ -1,29 +1,25 @@
-#include "Snowball.h"
+#include "Snowfall.h"
 
-#include <cmath>
 #include <cstring>
 #include <random>
-#include <glm/ext/quaternion_geometric.hpp>
 
-#include "OpenGL/Program.h"
+#include "Exceptions/Error.h"
+#include "Exceptions/MPMException.h"
 
-float Snowball::CalculateVolume() const
+void Snowfall::BuildInitialPositions()
 {
-    // Sphere Volume Formula
-    return 4.0f / 3.0f * Program::pi * this->snowballRadius * this->snowballRadius * this->snowballRadius;
-}
+    glm::vec3 spawnSize = spawnMax - spawnMin;
+    float spawnVolume = spawnSize.x * spawnSize.y * spawnSize.z;
 
-void Snowball::BuildInitialPositions()
-{
-    // Uniform distribution
-    this->particleVolume = this->CalculateVolume() / static_cast<float>(this->particleCount);
-
-    // Density = Mass / Volume
-    this->particleMass = this->snowDensity * particleVolume;
+    this->particleVolume = spawnVolume / static_cast<float>(this->particleCount);
+    this->particleMass = this->snowDensity * this->particleVolume;
 
     std::random_device randomDevice;
     std::mt19937 randomEngine(randomDevice());
-    std::uniform_real_distribution distribution(-this->snowballRadius, this->snowballRadius);
+
+    std::uniform_real_distribution distributionX(spawnMin.x, spawnMax.x);
+    std::uniform_real_distribution distributionY(spawnMin.y, spawnMax.y);
+    std::uniform_real_distribution distributionZ(spawnMin.z, spawnMax.z);
 
     try
     {
@@ -34,23 +30,13 @@ void Snowball::BuildInitialPositions()
         throw MPMException(exception.what(), Error::PositionMemoryAllocation);
     }
 
-    while (static_cast<int>(this->initialPositions.size()) < this->particleCount)
+    for (int i = 0; i < this->particleCount; i++)
     {
-        // ReSharper disable once CppTooWideScopeInitStatement
-        const glm::vec3 offset(distribution(randomEngine), distribution(randomEngine), distribution(randomEngine));
-
-        if (glm::length(offset) <= snowballRadius)
-        {
-            constexpr float snowballCenterZ = 0.8f;
-            constexpr float snowballCenterY = 3.0f;
-            constexpr float snowballCenterX = 2.56f;
-
-            initialPositions.emplace_back(snowballCenterX + offset.x, snowballCenterY + offset.y, snowballCenterZ + offset.z);
-        }
+        initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
     }
 }
 
-void Snowball::BuildParticleBlocks()
+void Snowfall::BuildParticleBlocks()
 {
     const int blockCount = (this->particleCount + 31) / 32;
 
@@ -74,7 +60,7 @@ void Snowball::BuildParticleBlocks()
         this->initialBlocks[blockIndex].positionY[lane] = this->initialPositions[particleIndex].y;
         this->initialBlocks[blockIndex].positionZ[lane] = this->initialPositions[particleIndex].z;
 
-        this->initialBlocks[blockIndex].mass[lane] = particleMass;
+        this->initialBlocks[blockIndex].mass[lane] = this->particleMass;
         this->initialBlocks[blockIndex].volume[lane] = this->particleVolume;
         this->initialBlocks[blockIndex].plasticVolume[lane] = 1.0f;
 
