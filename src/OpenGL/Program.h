@@ -6,36 +6,45 @@
 
 #include "Exceptions/MPMException.h"
 
-/**
- * Responsible for managing libraries and the main window
- */
 class Program
 {
 public:
     GLFWwindow* window;
 
-    /**
-     * Time between two frames
-     */
+    /* Time between frames */
     float deltaTime = 0.0f;
-    float lastFrame = 0.0f;
 
-    static constexpr GLsizei windowWidth = 800;
-    static constexpr GLsizei windowHeight = 600;
-
-    inline static const char* windowTitle = "MPM Snow Simulation";
-
-    static constexpr float pi = 3.14159265f;
+    /* Simulation Settings */
+    inline static int maxBlocks = 16384;
+    inline static int cellCountPerAxis = 256;
+    inline static float cellSize = 0.02f;
+    inline static float physicsTimeStep = 2e-4f;
+    inline static float gravity = 9.8f;
+    inline static float firstLameParameter = 1.333e4f;
+    inline static float secondLameParameter = 2.0e4f;
+    inline static float hardeningCoefficient = 10.0f;
+    inline static float criticalCompression = 0.025f;
+    inline static float criticalStretch = 0.0075f;
+    inline static float boundaryFriction = 0.8f;
+    inline static bool colliderEnabled = true;
+    /* ---- */
 
     explicit Program();
     ~Program();
 
+    void SwitchPause();
+    void ProcessInput();
+    void UpdateKeyStates();
+    void UpdateDeltaTime();
+    void LockCursor() const;
+    void UpdateFPSOnWindowTitle() const;
     void CreateWindowAndAssignContext();
     void SetViewportAndResizeCallback() const;
-    void LockCursor() const;
 
-    void ProcessInput() const;
-    void UpdateDeltaTime();
+    [[nodiscard]] bool WasFirstSceneSelected() const;
+    [[nodiscard]] bool WasSecondSceneSelected() const;
+    [[nodiscard]] bool WasPauseKeyPressed() const;
+    [[nodiscard]] bool IsPaused() const;
 
     static void InitializeGLFW();
     static void LoadGladLibrary();
@@ -43,17 +52,33 @@ public:
 
     static int ReportErrorAndTerminate(const MPMException& exception);
 private:
+    /* OpenGL Settings */
     static constexpr int majorVersion = 3;
     static constexpr int minorVersion = 3;
     static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
-
-    static constexpr int failureCode = 1;
+    static constexpr int glfwPlatform = GLFW_PLATFORM_X11;
 
     static constexpr GLFWmonitor* fullscreenMonitor = nullptr;
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 
     static constexpr GLint viewportBottomLeftX = 0;
     static constexpr GLint viewportBottomLeftY = 0;
+
+    static constexpr GLsizei windowWidth = 800;
+    static constexpr GLsizei windowHeight = 600;
+
+    inline static const char* windowTitle = "MPM Snow Simulation";
+    /* ---- */
+
+    float lastFrame = 0.0f;
+
+    bool firstSceneKeyPressed = false;
+    bool firstSceneKeyWasDown = false;
+    bool secondSceneKeyPressed = false;
+    bool secondSceneKeyWasDown = false;
+    bool pauseKeyPressed = false;
+    bool pauseKeyWasDown = false;
+    bool paused = false;
 };
 
 

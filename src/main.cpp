@@ -1,24 +1,24 @@
+#include <cstring>
+#include <random>
+#include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <vector>
-#include <random>
-#include <cstring>
 
-#include "OpenGL/Scene/Camera.h"
-#include "OpenGL/Program.h"
+#include <iostream>
+
+#include "CUDA/MeshBoundary.h"
+#include "CUDA/Simulation.h"
 #include "Exceptions/MPMException.h"
+#include "OpenGL/Program.h"
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/Particle.h"
+#include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Shaders/TextureLoader.h"
-#include "CUDA/Simulation.h"
-#include "OpenGL/Simulation/Configuration.h"
-#include "OpenGL/Simulation/Snowball.h"
 #include "OpenGL/Simulation/Snowfall.h"
-#include "CUDA/MeshBoundary.h"
 
 int main()
 {
@@ -29,16 +29,16 @@ int main()
         Program::InitializeGLFW();
         program.CreateWindowAndAssignContext();
         Program::LoadGladLibrary();
-        program.LockCursor();
     }
     catch (const MPMException& exception)
     {
         return Program::ReportErrorAndTerminate(exception);
     }
 
+    program.LockCursor();
     program.SetViewportAndResizeCallback();
 
-    Camera camera(program.window, Program::windowWidth, Program::windowHeight);
+    Camera camera(program.window);
     camera.AssignUserPointerAndSetCallbacks();
 
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
@@ -54,47 +54,56 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Model untitled(std::string(ASSETS_PATH) + "/ubb_logo.obj");
-
-    try
-    {
-        untitled.loadModel();
-    }
-    catch (const MPMException& exception)
-    {
-        return Program::ReportErrorAndTerminate(exception);
-    }
-
     sceneShader.Use();
-    sceneShader.SetVec3("directionalLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
-    sceneShader.SetVec3("directionalLight.ambient",   glm::vec3(0.5f, 0.5f, 0.5f));
-    sceneShader.SetVec3("directionalLight.diffuse",   glm::vec3(0.8f, 0.8f, 0.8f));
-    sceneShader.SetVec3("directionalLight.specular",  glm::vec3(1.0f, 1.0f, 1.0f));
-    sceneShader.SetFloat("material.shininess", 32.0f);
 
-    Snowfall snowfallInformation;
-    Snowball snowballInformation;
+    glm::vec3 direction = glm::vec3(-0.2f, -1.0f, -0.3f);
+    glm::vec3 ambient = glm::vec3(0.5f, 0.5f, 0.5f);
+    glm::vec3 diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
+    glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
+
+    float shininess = 32.0f;
+
+    sceneShader.SetVec3("directionalLight.direction", direction);
+    sceneShader.SetVec3("directionalLight.ambient", ambient);
+    sceneShader.SetVec3("directionalLight.diffuse", diffuse);
+    sceneShader.SetVec3("directionalLight.specular", specular);
+    sceneShader.SetFloat("material.shininess", shininess);
+
+    Model logoUBB(std::string(ASSETS_PATH) + "/ubb_logo.obj");
 
     try
     {
-        snowfallInformation.BuildInitialPositions();
-        snowfallInformation.BuildParticleBlocks();
-        snowballInformation.BuildInitialPositions();
-        snowballInformation.BuildParticleBlocks();
+        logoUBB.loadModel();
     }
     catch (const MPMException& exception)
     {
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Particle snowfall(snowfallInformation.initialPositions);
+    Snowfall snowfall;
 
-    Simulation simulation(snowfallInformation.particleCount, snowfallInformation.initialBlocks.data(), static_cast<int>(snowfallInformation.initialBlocks.size()), snowfall.GetVBO());
+    try
+    {
+        snowfall.BuildInitialPositions();
+        snowfall.BuildParticleBlocks();
+    }
+    catch (const MPMException& exception)
+    {
+        return Program::ReportErrorAndTerminate(exception);
+    }
 
-    const glm::mat4 logoModelMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(1.3f, 1.2f, 2.56f))
-                                    * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    auto logoTriangles = untitled.GetTriangles(logoModelMatrix);
-    auto solidCells = MeshBoundary::Voxelize(logoTriangles, 256, 0.02f);
+    Particle snowfallParticles(snowfall.initialPositions);
+
+    Simulation simulation(snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfallParticles.GetVBO());
+
+    constexpr glm::mat4 logoTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(1.3f, 1.2f, 2.56f));
+    // Blender Moment
+    const glm::mat4 logoRotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    const glm::mat4 logoModelMatrix = logoTranslation * logoRotation;
+
+    std::vector<std::array<glm::vec3, 3>> logoTriangles = logoUBB.GetTriangles(logoModelMatrix);
+    std::vector<uint8_t> solidCells = MeshBoundary::Voxelize(logoTriangles, Program::cellCountPerAxis, Program::cellSize);
+
     simulation.UploadMeshBoundary(solidCells);
 
     camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 7.5f), -90.0f, 0.0f);
@@ -102,56 +111,36 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     bool showLogo = true;
-    bool paused = false;
-
-    bool key1WasDown = false;
-    bool key2WasDown = false;
-    bool spaceWasDown = false;
 
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
 
-        const bool key1Down = glfwGetKey(program.window, GLFW_KEY_1) == GLFW_PRESS;
-        const bool key2Down = glfwGetKey(program.window, GLFW_KEY_2) == GLFW_PRESS;
-
-        const bool spaceDown = glfwGetKey(program.window, GLFW_KEY_SPACE) == GLFW_PRESS;
-
-        if (key1Down && !key1WasDown)
+        if (program.WasFirstSceneSelected())
         {
-            simulation.Reset(snowfallInformation.initialBlocks.data(), static_cast<int>(snowfallInformation.initialBlocks.size()));
+            simulation.SetSceneFlags(true);
+            simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
             showLogo = true;
         }
 
-        if (key2Down && !key2WasDown)
+        if (program.WasSecondSceneSelected())
         {
-            simulation.Reset(snowballInformation.initialBlocks.data(), static_cast<int>(snowballInformation.initialBlocks.size()));
-            camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 4.0f), -90.0f, 0.0f);
-            showLogo = false;
         }
 
-        if (spaceDown && !spaceWasDown)
+        if (program.WasPauseKeyPressed())
         {
-            paused = !paused;
+            program.SwitchPause();
         }
 
-        key1WasDown = key1Down;
-        key2WasDown = key2Down;
-        spaceWasDown = spaceDown;
-
-        if (program.deltaTime > 0.0f)
-        {
-            const int fps = static_cast<int>(1.0f / program.deltaTime);
-            const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
-            glfwSetWindowTitle(program.window, title.c_str());
-        }
+        program.UpdateKeyStates();
+        program.UpdateFPSOnWindowTitle();
 
         camera.UpdateSpeed(program.deltaTime);
 
         program.ProcessInput();
         camera.ProcessInput();
 
-        if (!paused)
+        if (!program.IsPaused())
         {
             for (int step = 0; step < 5; step++)
             {
@@ -166,18 +155,22 @@ int main()
         if (showLogo)
         {
             sceneShader.Use();
-            sceneShader.SetMat4("view", camera.viewMatrix);
-            sceneShader.SetMat4("projection", camera.projectionMatrix);
+
+            sceneShader.SetMat4("view", camera.GetViewMatrix());
+            sceneShader.SetMat4("projection", camera.GetProjectionMatrix());
             sceneShader.SetMat4("model", logoModelMatrix);
             sceneShader.SetMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(logoModelMatrix))));
-            sceneShader.SetVec3("viewPosition", camera.position);
-            untitled.Draw(sceneShader);
+            sceneShader.SetVec3("viewPosition", camera.GetPosition());
+
+            logoUBB.Draw(sceneShader);
         }
 
         particleShader.Use();
-        particleShader.SetMat4("view", camera.viewMatrix);
-        particleShader.SetMat4("projection", camera.projectionMatrix);
-        snowfall.Draw(particleShader);
+
+        particleShader.SetMat4("view", camera.GetViewMatrix());
+        particleShader.SetMat4("projection", camera.GetProjectionMatrix());
+
+        snowfallParticles.Draw(particleShader);
 
         glfwSwapBuffers(program.window);
         glfwPollEvents();

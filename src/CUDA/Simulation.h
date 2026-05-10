@@ -8,7 +8,6 @@
 #include "Structures/ParticleBuffer.h"
 #include "Structures/GridBuffer.h"
 #include "Structures/HashTable.h"
-#include "OpenGL/Simulation/Configuration.h"
 
 struct cudaGraphicsResource;
 
@@ -21,11 +20,10 @@ public:
     void SyncPositionsToVBO();
     void UploadMeshBoundary(const std::vector<uint8_t>& solidCells);
     void Reset(const ParticleBlock* initialBlocks, int blockCount);
+    void SetSceneFlags(bool colliderEnabled);
 
 private:
     int particleCount;
-
-    Configuration configuration;
 
     ParticleBlock* particleBlocks{};
     ParticleBlock* particleBlocksSortingBuffer{};

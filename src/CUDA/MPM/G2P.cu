@@ -90,6 +90,13 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
                 const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
+                if (blockIndex == UINT32_MAX)
+                {
+                    printf("G2P miss: particle %d pos=(%.3f,%.3f,%.3f) node=(%d,%d,%d)\n",
+                           particleIndex, positionX, positionY, positionZ, nodeX, nodeY, nodeZ);
+                    continue;
+                }
+
                 const auto localX = static_cast<uint32_t>(nodeX % blockSize);
                 const auto localY = static_cast<uint32_t>(nodeY % blockSize);
                 const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);

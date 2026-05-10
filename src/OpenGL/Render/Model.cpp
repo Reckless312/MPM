@@ -1,9 +1,6 @@
 #include "Model.h"
-
 #include <array>
-
 #include <glm/vec4.hpp>
-
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 #include "../Shaders/TextureLoader.h"
@@ -15,7 +12,7 @@ Model::Model(const std::string &path)
 
 void Model::Draw(const Shader &shader) const
 {
-    for (auto &mesh : this->meshes)
+    for (auto &mesh: this->meshes)
     {
         mesh.Draw(shader);
     }
@@ -41,15 +38,15 @@ void Model::processNode(const aiNode *node, const aiScene *scene)
 {
     this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
 
-    for (int i = 0; i < node->mNumMeshes; i++)
+    for (int meshIndex = 0; meshIndex < node->mNumMeshes; meshIndex++)
     {
-        aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+        aiMesh *mesh = scene->mMeshes[node->mMeshes[meshIndex]];
         this->processMesh(mesh, scene);
     }
 
-    for (int i = 0; i < node->mNumChildren; i++)
+    for (int childrenIndex = 0; childrenIndex < node->mNumChildren; childrenIndex++)
     {
-        this->processNode(node->mChildren[i], scene);
+        this->processNode(node->mChildren[childrenIndex], scene);
     }
 }
 
@@ -59,31 +56,31 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
     std::vector<unsigned int> indices;
     std::vector<Texture> textures;
 
-    for (int i = 0; i < mesh->mNumVertices; i++)
+    for (int vertexIndex = 0; vertexIndex < mesh->mNumVertices; vertexIndex++)
     {
         Vertex vertex{};
-        glm::vec3 vector;
+        glm::vec3 informationBuffer;
 
-        vector.x = mesh->mVertices[i].x;
-        vector.y = mesh->mVertices[i].y;
-        vector.z = mesh->mVertices[i].z;
+        informationBuffer.x = mesh->mVertices[vertexIndex].x;
+        informationBuffer.y = mesh->mVertices[vertexIndex].y;
+        informationBuffer.z = mesh->mVertices[vertexIndex].z;
 
-        vertex.Position = vector;
+        vertex.Position = informationBuffer;
 
-        vector.x = mesh->mNormals[i].x;
-        vector.y = mesh->mNormals[i].y;
-        vector.z = mesh->mNormals[i].z;
+        informationBuffer.x = mesh->mNormals[vertexIndex].x;
+        informationBuffer.y = mesh->mNormals[vertexIndex].y;
+        informationBuffer.z = mesh->mNormals[vertexIndex].z;
 
-        vertex.Normal = vector;
+        vertex.Normal = informationBuffer;
 
         if (mesh->mTextureCoords[0])
         {
-            glm::vec2 vec;
+            glm::vec2 textureCoordinates;
 
-            vec.x = mesh->mTextureCoords[0][i].x;
-            vec.y = mesh->mTextureCoords[0][i].y;
+            textureCoordinates.x = mesh->mTextureCoords[0][vertexIndex].x;
+            textureCoordinates.y = mesh->mTextureCoords[0][vertexIndex].y;
 
-            vertex.TextureCoordinates = vec;
+            vertex.TextureCoordinates = textureCoordinates;
         }
         else
         {
@@ -93,13 +90,13 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
         vertices.push_back(vertex);
     }
 
-    for (int i = 0; i < mesh->mNumFaces; i++)
+    for (int faceIndex = 0; faceIndex < mesh->mNumFaces; faceIndex++)
     {
-        aiFace face = mesh->mFaces[i];
+        aiFace face = mesh->mFaces[faceIndex];
 
-        for (int j = 0; j < face.mNumIndices; j++)
+        for (int currentIndex = 0; currentIndex < face.mNumIndices; currentIndex++)
         {
-            indices.push_back(face.mIndices[j]);
+            indices.push_back(face.mIndices[currentIndex]);
         }
     }
 
@@ -120,13 +117,13 @@ std::vector<std::array<glm::vec3, 3>> Model::GetTriangles(const glm::mat4& model
 
     for (const auto& mesh : this->meshes)
     {
-        for (size_t i = 0; i < mesh.indices.size(); i += 3)
+        for (auto& triangle : mesh.GetTriangles())
         {
-            glm::vec3 v0 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i    ]].Position, 1.0f));
-            glm::vec3 v1 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i + 1]].Position, 1.0f));
-            glm::vec3 v2 = glm::vec3(modelMatrix * glm::vec4(mesh.vertices[mesh.indices[i + 2]].Position, 1.0f));
+            const glm::vec3 firstVertex = glm::vec3(modelMatrix * glm::vec4(triangle[0], 1.0f));
+            const glm::vec3 secondVertex = glm::vec3(modelMatrix * glm::vec4(triangle[1], 1.0f));
+            const glm::vec3 thirdVertex = glm::vec3(modelMatrix * glm::vec4(triangle[2], 1.0f));
 
-            triangles.push_back({v0, v1, v2});
+            triangles.push_back({firstVertex, secondVertex, thirdVertex});
         }
     }
 
