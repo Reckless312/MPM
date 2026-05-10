@@ -7,39 +7,14 @@
 class RenderObject {
 public:
     RenderObject() = default;
+    virtual ~RenderObject();
 
-    RenderObject(RenderObject&& other) noexcept : VAO(other.VAO), VBO(other.VBO)
-    {
-        other.VAO = 0;
-        other.VBO = 0;
-    }
-
-    RenderObject& operator=(RenderObject&& other) noexcept
-    {
-        if (this != &other)
-        {
-            glDeleteVertexArrays(1, &VAO);
-            glDeleteBuffers(1, &VBO);
-            VAO = other.VAO;
-            VBO = other.VBO;
-            other.VAO = 0;
-            other.VBO = 0;
-        }
-        return *this;
-    }
-
-    RenderObject(const RenderObject&) = delete;
-    RenderObject& operator=(const RenderObject&) = delete;
-
-    virtual ~RenderObject()
-    {
-        glDeleteVertexArrays(1, &VAO);
-        glDeleteBuffers(1, &VBO);
-    }
-
-    unsigned int GetVBO() const { return VBO; }
+    RenderObject(RenderObject&& other) noexcept;
+    RenderObject& operator=(RenderObject&& other) noexcept;
 
     virtual void Draw(const Shader &shader) const = 0;
+
+    [[nodiscard]] unsigned int GetVBO() const;
 
 protected:
     unsigned int VAO{}, VBO{};

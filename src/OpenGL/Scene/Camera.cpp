@@ -3,10 +3,15 @@
 #include "Camera.h"
 #include "Exceptions/MPMException.h"
 
-Camera::Camera(GLFWwindow* window, GLsizei windowWidth, GLsizei windowHeight) : window(window)
+Camera::Camera(GLFWwindow* window)
 {
-    this->windowWidth = static_cast<float>(windowWidth);
-    this->windowHeight = static_cast<float>(windowHeight);
+    this->window = window;
+
+    int initialWindowWidth, initialWindowHeight;
+    glfwGetWindowSize(this->window, &initialWindowWidth, &initialWindowHeight);
+
+    this->windowWidth = static_cast<float>(initialWindowWidth);
+    this->windowHeight = static_cast<float>(initialWindowHeight);
 
     this->mouseXDirection = this->windowWidth / 2.0f;
     this->mouseYDirection = this->windowHeight / 2.0f;
@@ -20,14 +25,19 @@ Camera::Camera(GLFWwindow* window, GLsizei windowWidth, GLsizei windowHeight) : 
     this->UpdateProjectionMatrix();
 }
 
+void Camera::UpdateRightVector()
+{
+    this->right = glm::normalize(glm::cross(this->front, this->up));
+}
+
 void Camera::UpdateViewMatrix()
 {
     this->viewMatrix = glm::lookAt(this->position, this->position + this->front, this->up);
 }
 
-void Camera::UpdateRightVector()
+void Camera::UpdateProjectionMatrix()
 {
-    this->right = glm::normalize(glm::cross(this->front, this->up));
+    this->projectionMatrix = glm::perspective(glm::radians(this->fov),  this->windowWidth / this->windowHeight, this->nearPlane, this->farPlane);
 }
 
 void Camera::UpdateSpeed(const float deltaTime)
@@ -35,12 +45,28 @@ void Camera::UpdateSpeed(const float deltaTime)
     this->speed = this->speedMultiplier * deltaTime;
 }
 
-void Camera::SetInitialOrientation(glm::vec3 position, float yaw, float pitch)
+void Camera::SetInitialOrientation(const glm::vec3 desiredPosition, const float desiredYaw, const float desiredPitch)
 {
-    this->position = position;
-    this->yaw = yaw;
-    this->pitch = pitch;
+    this->position = desiredPosition;
+    this->yaw = desiredYaw;
+    this->pitch = desiredPitch;
+
     this->UpdateDirection();
+}
+
+glm::vec3 Camera::GetPosition() const
+{
+    return this->position;
+}
+
+glm::mat4 Camera::GetViewMatrix() const
+{
+    return this->viewMatrix;
+}
+
+glm::mat4 Camera::GetProjectionMatrix() const
+{
+    return this->projectionMatrix;
 }
 
 void Camera::UpdateDirection()
@@ -99,14 +125,9 @@ void Camera::UpdateMousePosition(const float currentXDirection, const float curr
 
     this->yaw += xDirectionOffset;
 
-    // Negating to invert Up and Down (me not like it)
+    // Invert up and down
     this->UpdatePitch(-yDirectionOffset);
     this->UpdateDirection();
-}
-
-void Camera::UpdateProjectionMatrix()
-{
-    this->projectionMatrix = glm::perspective(glm::radians(this->fov),  this->windowWidth / this->windowHeight, this->nearPlane, this->farPlane);
 }
 
 void Camera::AssignUserPointerAndSetCallbacks()

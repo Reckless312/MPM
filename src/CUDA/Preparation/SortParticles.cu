@@ -38,6 +38,14 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
     const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
+    if (blockIndex == UINT32_MAX)
+    {
+        printf("ComputeSortKeys miss: particle %d pos=(%.3f,%.3f,%.3f)\n",
+               particleIndex, positionX, positionY, positionZ);
+        sortKeys[particleIndex] = UINT64_MAX;
+        return;
+    }
+
     const auto localX = static_cast<uint32_t>(cellX % blockSize);
     const auto localY = static_cast<uint32_t>(cellY % blockSize);
     const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
@@ -127,13 +135,22 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
         const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
         const uint32_t blockIndex = Lookup(hashTable, blockCode);
 
-        const auto localX = static_cast<uint32_t>(cellX % blockSize);
-        const auto localY = static_cast<uint32_t>(cellY % blockSize);
-        const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
+        if (blockIndex == UINT32_MAX)
+        {
+            printf("WarpSort miss: particle %d pos=(%.3f,%.3f,%.3f)\n",
+                   particleIndex, positionX, positionY, positionZ);
+            key = UINT32_MAX;
+        }
+        else
+        {
+            const auto localX = static_cast<uint32_t>(cellX % blockSize);
+            const auto localY = static_cast<uint32_t>(cellY % blockSize);
+            const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
 
-        const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
+            const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
 
-        key = (blockIndex << cellBits) | cellCode;
+            key = (blockIndex << cellBits) | cellCode;
+        }
     }
     else
     {
