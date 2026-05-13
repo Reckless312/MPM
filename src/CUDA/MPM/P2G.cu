@@ -72,59 +72,69 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     float affineMomentumMatrix[9];
     float deformationGradient[9];
 
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         affineMomentumMatrix[componentIndex] = particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane];
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
     }
 
-    float u11, u12, u13, u21, u22, u23, u31, u32, u33;
-    float s11, s22, s33;
-    float v11, v12, v13, v21, v22, v23, v31, v32, v33;
+    float u[9], s[3], v[9];
 
     svd(deformationGradient[0], deformationGradient[1], deformationGradient[2],
         deformationGradient[3], deformationGradient[4], deformationGradient[5],
         deformationGradient[6], deformationGradient[7], deformationGradient[8],
-        u11, u12, u13, u21, u22, u23, u31, u32, u33,
-        s11, s22, s33,
-        v11, v12, v13, v21, v22, v23, v31, v32, v33);
+        u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8],
+        s[0], s[1], s[2],
+        v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
 
-    const float r00 = u11*v11 + u12*v12 + u13*v13;
-    const float r01 = u11*v21 + u12*v22 + u13*v23;
-    const float r02 = u11*v31 + u12*v32 + u13*v33;
-    const float r10 = u21*v11 + u22*v12 + u23*v13;
-    const float r11 = u21*v21 + u22*v22 + u23*v23;
-    const float r12 = u21*v31 + u22*v32 + u23*v33;
-    const float r20 = u31*v11 + u32*v12 + u33*v13;
-    const float r21 = u31*v21 + u32*v22 + u33*v23;
-    const float r22 = u31*v31 + u32*v32 + u33*v33;
+    float r[9];
+    #pragma unroll
+    for (int row = 0; row < 3; row++)
+    {
+        #pragma unroll
+        for (int column = 0; column < 3; column++)
+        {
+            float value = 0.0f;
+            #pragma unroll
+            for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
+            {
+                value += u[row * 3 + contractionIndex] * v[column * 3 + contractionIndex];
+            }
+            r[row * 3 + column] = value;
+        }
+    }
 
-    const float J = s11 * s22 * s33;
+    const float J = s[0] * s[1] * s[2];
 
-    const float a00 = deformationGradient[0] - r00;
-    const float a01 = deformationGradient[1] - r01;
-    const float a02 = deformationGradient[2] - r02;
-    const float a10 = deformationGradient[3] - r10;
-    const float a11 = deformationGradient[4] - r11;
-    const float a12 = deformationGradient[5] - r12;
-    const float a20 = deformationGradient[6] - r20;
-    const float a21 = deformationGradient[7] - r21;
-    const float a22 = deformationGradient[8] - r22;
+    float a[9];
+    #pragma unroll
+    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
+    {
+        a[componentIndex] = deformationGradient[componentIndex] - r[componentIndex];
+    }
 
     const float hardening = expf(hardeningCoefficient * (1.0f - plasticVolume));
     const float effectiveShearModulus = shearModulus * hardening;
     const float effectiveFirstLameParameter = firstLameParameter * hardening;
     const float volumetricStress = effectiveFirstLameParameter * (J - 1.0f) * J;
 
-    const float kirchhoff00 = 2.0f * effectiveShearModulus * (a00*deformationGradient[0] + a01*deformationGradient[1] + a02*deformationGradient[2]) + volumetricStress;
-    const float kirchhoff01 = 2.0f * effectiveShearModulus * (a00*deformationGradient[3] + a01*deformationGradient[4] + a02*deformationGradient[5]);
-    const float kirchhoff02 = 2.0f * effectiveShearModulus * (a00*deformationGradient[6] + a01*deformationGradient[7] + a02*deformationGradient[8]);
-    const float kirchhoff10 = 2.0f * effectiveShearModulus * (a10*deformationGradient[0] + a11*deformationGradient[1] + a12*deformationGradient[2]);
-    const float kirchhoff11 = 2.0f * effectiveShearModulus * (a10*deformationGradient[3] + a11*deformationGradient[4] + a12*deformationGradient[5]) + volumetricStress;
-    const float kirchhoff12 = 2.0f * effectiveShearModulus * (a10*deformationGradient[6] + a11*deformationGradient[7] + a12*deformationGradient[8]);
-    const float kirchhoff20 = 2.0f * effectiveShearModulus * (a20*deformationGradient[0] + a21*deformationGradient[1] + a22*deformationGradient[2]);
-    const float kirchhoff21 = 2.0f * effectiveShearModulus * (a20*deformationGradient[3] + a21*deformationGradient[4] + a22*deformationGradient[5]);
-    const float kirchhoff22 = 2.0f * effectiveShearModulus * (a20*deformationGradient[6] + a21*deformationGradient[7] + a22*deformationGradient[8]) + volumetricStress;
+    float kirchhoff[9];
+    #pragma unroll
+    for (int row = 0; row < 3; row++)
+    {
+        #pragma unroll
+        for (int column = 0; column < 3; column++)
+        {
+            float value = 0.0f;
+            #pragma unroll
+            for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
+            {
+                value += a[row * 3 + contractionIndex] * deformationGradient[column * 3 + contractionIndex];
+            }
+            kirchhoff[row * 3 + column] = 2.0f * effectiveShearModulus * value + (row == column ? volumetricStress : 0.0f);
+        }
+    }
 
     const float stressScale = -4.0f / (cellSize * cellSize) * volume * deltaTime;
 
@@ -176,9 +186,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
                 const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
 
-                const float stressForceX = kirchhoff00 * particleToNodeOffsetX + kirchhoff01 * particleToNodeOffsetY + kirchhoff02 * particleToNodeOffsetZ;
-                const float stressForceY = kirchhoff10 * particleToNodeOffsetX + kirchhoff11 * particleToNodeOffsetY + kirchhoff12 * particleToNodeOffsetZ;
-                const float stressForceZ = kirchhoff20 * particleToNodeOffsetX + kirchhoff21 * particleToNodeOffsetY + kirchhoff22 * particleToNodeOffsetZ;
+                const float stressForceX = kirchhoff[0] * particleToNodeOffsetX + kirchhoff[1] * particleToNodeOffsetY + kirchhoff[2] * particleToNodeOffsetZ;
+                const float stressForceY = kirchhoff[3] * particleToNodeOffsetX + kirchhoff[4] * particleToNodeOffsetY + kirchhoff[5] * particleToNodeOffsetZ;
+                const float stressForceZ = kirchhoff[6] * particleToNodeOffsetX + kirchhoff[7] * particleToNodeOffsetY + kirchhoff[8] * particleToNodeOffsetZ;
 
                 const float momentumX = mass * (velocityX + affineMomentumMatrix[0] * particleToNodeOffsetX + affineMomentumMatrix[1] * particleToNodeOffsetY + affineMomentumMatrix[2] * particleToNodeOffsetZ) + stressScale * stressForceX;
                 const float momentumY = mass * (velocityY + affineMomentumMatrix[3] * particleToNodeOffsetX + affineMomentumMatrix[4] * particleToNodeOffsetY + affineMomentumMatrix[5] * particleToNodeOffsetZ) + stressScale * stressForceY;

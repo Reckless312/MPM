@@ -24,6 +24,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
     float deformationGradient[9];
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
@@ -125,18 +126,22 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     float velocityGradient[9];
 
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         velocityGradient[componentIndex] = velocityGradientScale * bMatrix[componentIndex];
     }
 
     float newDeformationGradient[9];
+    #pragma unroll
     for (int row = 0; row < 3; row++)
     {
+        #pragma unroll
         for (int column = 0; column < 3; column++)
         {
             float value = deformationGradient[row * 3 + column];
 
+            #pragma unroll
             for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
             {
                 value += deltaTime * velocityGradient[row * 3 + contractionIndex] * deformationGradient[contractionIndex * 3 + column];
@@ -146,35 +151,43 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
         }
     }
 
-    float u11, u12, u13, u21, u22, u23, u31, u32, u33;
-    float s11, s22, s33;
-    float v11, v12, v13, v21, v22, v23, v31, v32, v33;
+    float u[9], s[3], v[9];
 
     svd(newDeformationGradient[0], newDeformationGradient[1], newDeformationGradient[2],
         newDeformationGradient[3], newDeformationGradient[4], newDeformationGradient[5],
         newDeformationGradient[6], newDeformationGradient[7], newDeformationGradient[8],
-        u11, u12, u13, u21, u22, u23, u31, u32, u33,
-        s11, s22, s33,
-        v11, v12, v13, v21, v22, v23, v31, v32, v33);
+        u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8],
+        s[0], s[1], s[2],
+        v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8]);
 
-    const float clampedS11 = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s11));
-    const float clampedS22 = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s22));
-    const float clampedS33 = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s33));
+    float clampedS[3];
+    #pragma unroll
+    for (int i = 0; i < 3; i++)
+    {
+        clampedS[i] = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s[i]));
+    }
 
-    const float elasticDeformationGradient00 = u11*clampedS11*v11 + u12*clampedS22*v12 + u13*clampedS33*v13;
-    const float elasticDeformationGradient01 = u11*clampedS11*v21 + u12*clampedS22*v22 + u13*clampedS33*v23;
-    const float elasticDeformationGradient02 = u11*clampedS11*v31 + u12*clampedS22*v32 + u13*clampedS33*v33;
-    const float elasticDeformationGradient10 = u21*clampedS11*v11 + u22*clampedS22*v12 + u23*clampedS33*v13;
-    const float elasticDeformationGradient11 = u21*clampedS11*v21 + u22*clampedS22*v22 + u23*clampedS33*v23;
-    const float elasticDeformationGradient12 = u21*clampedS11*v31 + u22*clampedS22*v32 + u23*clampedS33*v33;
-    const float elasticDeformationGradient20 = u31*clampedS11*v11 + u32*clampedS22*v12 + u33*clampedS33*v13;
-    const float elasticDeformationGradient21 = u31*clampedS11*v21 + u32*clampedS22*v22 + u33*clampedS33*v23;
-    const float elasticDeformationGradient22 = u31*clampedS11*v31 + u32*clampedS22*v32 + u33*clampedS33*v33;
+    float elasticDeformationGradient[9];
+    #pragma unroll
+    for (int row = 0; row < 3; row++)
+    {
+        #pragma unroll
+        for (int column = 0; column < 3; column++)
+        {
+            float value = 0.0f;
+            #pragma unroll
+            for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
+            {
+                value += u[row * 3 + contractionIndex] * clampedS[contractionIndex] * v[column * 3 + contractionIndex];
+            }
+            elasticDeformationGradient[row * 3 + column] = value;
+        }
+    }
 
     const float oldPlasticVolume = particleBlocks[particleBlockIndex].plasticVolume[lane];
 
-    const float detFNew = s11 * s22 * s33;
-    const float detFElastic = clampedS11 * clampedS22 * clampedS33;
+    const float detFNew = s[0] * s[1] * s[2];
+    const float detFElastic = clampedS[0] * clampedS[1] * clampedS[2];
 
     const float newPlasticVolume = oldPlasticVolume * detFNew / detFElastic;
 
@@ -211,19 +224,16 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     particleBlocks[particleBlockIndex].velocityY[lane] = newVelocityY;
     particleBlocks[particleBlockIndex].velocityZ[lane] = newVelocityZ;
 
+    #pragma unroll
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
         particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = velocityGradient[componentIndex];
     }
 
-    particleBlocks[particleBlockIndex].deformationGradient[0][lane] = elasticDeformationGradient00;
-    particleBlocks[particleBlockIndex].deformationGradient[1][lane] = elasticDeformationGradient01;
-    particleBlocks[particleBlockIndex].deformationGradient[2][lane] = elasticDeformationGradient02;
-    particleBlocks[particleBlockIndex].deformationGradient[3][lane] = elasticDeformationGradient10;
-    particleBlocks[particleBlockIndex].deformationGradient[4][lane] = elasticDeformationGradient11;
-    particleBlocks[particleBlockIndex].deformationGradient[5][lane] = elasticDeformationGradient12;
-    particleBlocks[particleBlockIndex].deformationGradient[6][lane] = elasticDeformationGradient20;
-    particleBlocks[particleBlockIndex].deformationGradient[7][lane] = elasticDeformationGradient21;
-    particleBlocks[particleBlockIndex].deformationGradient[8][lane] = elasticDeformationGradient22;
+    #pragma unroll
+    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
+    {
+        particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = elasticDeformationGradient[componentIndex];
+    }
     particleBlocks[particleBlockIndex].plasticVolume[lane] = newPlasticVolume;
 }
