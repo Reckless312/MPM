@@ -6,6 +6,15 @@
 
 #include "Exceptions/MPMException.h"
 
+struct SceneParameters
+{
+    float firstLameParameter;
+    float secondLameParameter;
+    float hardeningCoefficient;
+    float criticalCompression;
+    float criticalStretch;
+};
+
 class Program
 {
 public:
@@ -26,7 +35,6 @@ public:
     inline static float criticalCompression = 0.025f;
     inline static float criticalStretch = 0.0075f;
     inline static float boundaryFriction = 0.8f;
-    inline static bool colliderEnabled = true;
     /* ---- */
 
     explicit Program();
@@ -46,6 +54,7 @@ public:
     [[nodiscard]] bool WasPauseKeyPressed() const;
     [[nodiscard]] bool IsPaused() const;
 
+    static void ApplySceneParameters(const SceneParameters& sceneParameters);
     static void InitializeGLFW();
     static void LoadGladLibrary();
     static void ResizeWindow(GLFWwindow* window, int width, int height);

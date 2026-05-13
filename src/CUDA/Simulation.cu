@@ -6,29 +6,13 @@
 #include "MPM/P2G.h"
 #include "MPM/UpdateGrid.h"
 #include "MPM/G2P.h"
+#include "WritePositionsKernel.h"
 #include <cuda_runtime.h>
 #include <glad/glad.h>
 #include <cuda_gl_interop.h>
 #include <cub/cub.cuh>
 #include <utility>
 #include "OpenGL/Program.h"
-
-__global__ void WritePositionsKernel(const ParticleBlock* particleBlocks, float* buffer, const int particleCount)
-{
-    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (particleIndex >= particleCount)
-    {
-        return;
-    }
-
-    const int particleBlockIndex = particleIndex / 32;
-    const int lane = particleIndex % 32;
-
-    buffer[particleIndex * 3 + 0] = particleBlocks[particleBlockIndex].positionX[lane];
-    buffer[particleIndex * 3 + 1] = particleBlocks[particleBlockIndex].positionY[lane];
-    buffer[particleIndex * 3 + 2] = particleBlocks[particleBlockIndex].positionZ[lane];
-}
 
 Simulation::Simulation(const int particleCount, const ParticleBlock* initialParticleBlocks, const int particleBlockCount, const unsigned int vbo)
 {
@@ -101,49 +85,38 @@ void Simulation::Step()
 
     if (needsRebuild)
     {
-        printf("Rebuild triggered after %d skipped steps\n", stepsSinceLastRebuild);
-        stepsSinceLastRebuild = 0;
         CUDA_CHECK(cudaMemset(blockCodeToIndex.keys, 0xFF, Program::maxBlocks * sizeof(uint64_t)));
         CUDA_CHECK(cudaMemset(nextBlockIndex, 0, sizeof(uint32_t)));
 
         RebuildMappingKernel<<<launchBlocks, threadsPerBlock>>>(particleBlocks, particleCount, blockCodeToIndex, nextBlockIndex, blockCodes, Program::cellSize);
         CUDA_CHECK(cudaGetLastError());
-        CUDA_CHECK(cudaDeviceSynchronize());
 
         SortParticles(particleBlocks, particleBlocksSortingBuffer, blockCodeToIndex, particleCount, Program::cellSize, particleSortKeys, particleSortKeysResult, particleIndices, sortedParticleIndices, nvidiaCUBTemporaryStorage, nvidiaCUBTemporaryStorageBytes);
         CUDA_CHECK(cudaGetLastError());
-        CUDA_CHECK(cudaDeviceSynchronize());
 
         std::swap(particleBlocks, particleBlocksSortingBuffer);
 
-    }
-    else
-    {
-        stepsSinceLastRebuild++;
+        CUDA_CHECK(cudaMemcpy(&activeBlockCount, nextBlockIndex, sizeof(uint32_t), cudaMemcpyDeviceToHost));
     }
 
     WarpSort(particleBlocks, particleCount, blockCodeToIndex, Program::cellSize, particleHomeBlockCodes);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 
-    CUDA_CHECK(cudaMemset(gridBlocks, 0, Program::maxBlocks * sizeof(GridBlock)));
+    CUDA_CHECK(cudaMemset(gridBlocks, 0, activeBlockCount * sizeof(GridBlock)));
 
     const size_t bSplineSharedMemoryBytes = threadsPerBlock * 9 * sizeof(float);
 
     P2GKernel<<<launchBlocks, threadsPerBlock, bSplineSharedMemoryBytes>>>(particleBlocks, gridBlocks, particleCount, blockCodeToIndex, Program::cellSize, Program::physicsTimeStep, Program::secondLameParameter, Program::firstLameParameter, Program::hardeningCoefficient, needsRebuild, particleHomeBlockCodes);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 
     const int totalNodes = Program::maxBlocks * nodesPerBlock;
     const int gridLaunchBlocks = (totalNodes + threadsPerBlock - 1) / threadsPerBlock;
 
-    UpdateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, Program::maxBlocks, Program::physicsTimeStep, Program::gravity, Program::cellCountPerAxis, Program::boundaryFriction, solidCells, Program::colliderEnabled);
+    UpdateGridKernel<<<gridLaunchBlocks, threadsPerBlock>>>(gridBlocks, blockCodes, Program::maxBlocks, Program::physicsTimeStep, Program::gravity, Program::cellCountPerAxis, Program::boundaryFriction, solidCells);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 
     G2PKernel<<<launchBlocks, threadsPerBlock, bSplineSharedMemoryBytes>>>(particleBlocks, gridBlocks, particleCount, blockCodeToIndex, Program::cellSize, Program::physicsTimeStep, Program::criticalCompression, Program::criticalStretch, particleHomeBlockCodes, rebuildFlag);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 }
 
 void Simulation::SyncPositionsToVBO()
@@ -162,7 +135,8 @@ void Simulation::SyncPositionsToVBO()
     CUDA_CHECK(cudaGraphicsUnmapResources(1, &vboResource));
 }
 
-void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount)
+
+void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount) const
 {
     CUDA_CHECK(cudaMemcpy(particleBlocks, initialBlocks, blockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(blockCodeToIndex.keys, 0xFF, Program::maxBlocks * sizeof(uint64_t)));
@@ -172,17 +146,16 @@ void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount)
 
     constexpr uint32_t forceRebuild = 1u;
     CUDA_CHECK(cudaMemcpy(rebuildFlag, &forceRebuild, sizeof(uint32_t), cudaMemcpyHostToDevice));
-
-    stepsSinceLastRebuild = 0;
 }
 
-void Simulation::SetSceneFlags(const bool colliderEnabled)
-{
-    Program::colliderEnabled = colliderEnabled;
-}
-
-void Simulation::UploadMeshBoundary(const std::vector<uint8_t>& solidCellsHost)
+void Simulation::UploadMeshBoundary(const std::vector<uint8_t>& solidCellsHost) const
 {
     const size_t solidCellsSize = Program::cellCountPerAxis * Program::cellCountPerAxis * Program::cellCountPerAxis * sizeof(uint8_t);
-    CUDA_CHECK(cudaMemcpy(solidCells, solidCellsHost.data(), solidCellsSize, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(this->solidCells, solidCellsHost.data(), solidCellsSize, cudaMemcpyHostToDevice));
+}
+
+void Simulation::ClearMeshBoundary() const
+{
+    const size_t solidCellsSize = Program::cellCountPerAxis * Program::cellCountPerAxis * Program::cellCountPerAxis * sizeof(uint8_t);
+    CUDA_CHECK(cudaMemset(solidCells, 0, solidCellsSize));
 }

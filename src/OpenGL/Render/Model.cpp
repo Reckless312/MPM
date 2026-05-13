@@ -36,7 +36,14 @@ void Model::loadModel()
 
 void Model::processNode(const aiNode *node, const aiScene *scene)
 {
-    this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
+    try
+    {
+        this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
+    }
+    catch (const std::exception& exception)
+    {
+        throw MPMException(exception.what(), Error::ModelMemoryAllocation);
+    }
 
     for (int meshIndex = 0; meshIndex < node->mNumMeshes; meshIndex++)
     {

@@ -8,18 +8,18 @@
 
 void Snowfall::BuildInitialPositions()
 {
-    glm::vec3 spawnSize = spawnMax - spawnMin;
-    float spawnVolume = spawnSize.x * spawnSize.y * spawnSize.z;
+    const glm::vec3 boxDiagonal = upperRightBoxCorner - lowerLeftBoxCorner;
+    const float boxVolume = boxDiagonal.x * boxDiagonal.y * boxDiagonal.z;
 
-    this->particleVolume = spawnVolume / static_cast<float>(this->particleCount);
+    this->particleVolume = boxVolume / static_cast<float>(this->particleCount);
     this->particleMass = this->snowDensity * this->particleVolume;
 
     std::random_device randomDevice;
     std::mt19937 randomEngine(randomDevice());
 
-    std::uniform_real_distribution distributionX(spawnMin.x, spawnMax.x);
-    std::uniform_real_distribution distributionY(spawnMin.y, spawnMax.y);
-    std::uniform_real_distribution distributionZ(spawnMin.z, spawnMax.z);
+    std::uniform_real_distribution distributionX(lowerLeftBoxCorner.x, upperRightBoxCorner.x);
+    std::uniform_real_distribution distributionY(lowerLeftBoxCorner.y, upperRightBoxCorner.y);
+    std::uniform_real_distribution distributionZ(lowerLeftBoxCorner.z, upperRightBoxCorner.z);
 
     try
     {
@@ -30,7 +30,7 @@ void Snowfall::BuildInitialPositions()
         throw MPMException(exception.what(), Error::PositionMemoryAllocation);
     }
 
-    for (int i = 0; i < this->particleCount; i++)
+    for (int particle = 0; particle < this->particleCount; particle++)
     {
         initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
     }

@@ -1,5 +1,3 @@
-#include <cstring>
-#include <random>
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -7,9 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include <iostream>
-
-#include "CUDA/MeshBoundary.h"
+#include "OpenGL/Simulation/MeshBoundary.h"
 #include "CUDA/Simulation.h"
 #include "Exceptions/MPMException.h"
 #include "OpenGL/Program.h"
@@ -17,7 +13,6 @@
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
-#include "OpenGL/Shaders/TextureLoader.h"
 #include "OpenGL/Simulation/Snowfall.h"
 
 int main()
@@ -80,6 +75,24 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
+    constexpr SceneParameters snowfallSceneParameters = {
+        .firstLameParameter = 1.333e4f,
+        .secondLameParameter = 2.0e4f,
+        .hardeningCoefficient = 10.0f,
+        .criticalCompression = 0.025f,
+        .criticalStretch = 0.0075f
+    };
+
+    constexpr SceneParameters crawlingSceneParameters = {
+        .firstLameParameter = 0.889e4f,
+        .secondLameParameter = 1.333e4f,
+        .hardeningCoefficient = 10.0f,
+        .criticalCompression = 0.025f,
+        .criticalStretch = 0.0075f
+    };
+
+    Program::ApplySceneParameters(snowfallSceneParameters);
+
     Snowfall snowfall;
 
     try
@@ -110,7 +123,7 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
-    bool showLogo = true;
+    int activeScene = 1;
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -118,13 +131,18 @@ int main()
 
         if (program.WasFirstSceneSelected())
         {
-            simulation.SetSceneFlags(true);
+            activeScene = 1;
+            Program::ApplySceneParameters(snowfallSceneParameters);
+            simulation.UploadMeshBoundary(solidCells);
             simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
-            showLogo = true;
         }
 
         if (program.WasSecondSceneSelected())
         {
+            activeScene = 2;
+            Program::ApplySceneParameters(crawlingSceneParameters);
+            simulation.ClearMeshBoundary();
+            simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
         }
 
         if (program.WasPauseKeyPressed())
@@ -152,7 +170,7 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if (showLogo)
+        if (activeScene == 1)
         {
             sceneShader.Use();
 

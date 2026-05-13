@@ -41,8 +41,10 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/MPM/G2P.cu
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
-        src/CUDA/MeshBoundary.h
-        src/CUDA/MeshBoundary.cpp
+        src/CUDA/WritePositionsKernel.h
+        src/CUDA/WritePositionsKernel.cu
+        src/OpenGL/Simulation/MeshBoundary.h
+        src/OpenGL/Simulation/MeshBoundary.cpp
         src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/Snowfall.cpp
         src/OpenGL/Simulation/Snowfall.h

@@ -138,3 +138,12 @@ void Program::UpdateFPSOnWindowTitle() const
         glfwSetWindowTitle(this->window, title.c_str());
     }
 }
+
+void Program::ApplySceneParameters(const SceneParameters& sceneParameters)
+{
+    firstLameParameter = sceneParameters.firstLameParameter;
+    secondLameParameter = sceneParameters.secondLameParameter;
+    hardeningCoefficient = sceneParameters.hardeningCoefficient;
+    criticalCompression = sceneParameters.criticalCompression;
+    criticalStretch = sceneParameters.criticalStretch;
+}

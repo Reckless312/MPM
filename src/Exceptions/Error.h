@@ -15,6 +15,7 @@ enum class Error
     ModelLoad = 10,
     PositionMemoryAllocation = 11,
     BlocksMemoryAllocation = 12,
+    ModelMemoryAllocation = 13,
 };
 
 #endif

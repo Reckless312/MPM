@@ -40,8 +40,6 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
 
     if (blockIndex == UINT32_MAX)
     {
-        printf("ComputeSortKeys miss: particle %d pos=(%.3f,%.3f,%.3f)\n",
-               particleIndex, positionX, positionY, positionZ);
         sortKeys[particleIndex] = UINT64_MAX;
         return;
     }
@@ -137,8 +135,6 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
 
         if (blockIndex == UINT32_MAX)
         {
-            printf("WarpSort miss: particle %d pos=(%.3f,%.3f,%.3f)\n",
-                   particleIndex, positionX, positionY, positionZ);
             key = UINT32_MAX;
         }
         else

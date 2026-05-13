@@ -18,9 +18,9 @@ public:
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
-    void UploadMeshBoundary(const std::vector<uint8_t>& solidCells);
-    void Reset(const ParticleBlock* initialBlocks, int blockCount);
-    void SetSceneFlags(bool colliderEnabled);
+    void UploadMeshBoundary(const std::vector<uint8_t>& solidCellsHost) const;
+    void ClearMeshBoundary() const;
+    void Reset(const ParticleBlock* initialBlocks, int blockCount) const;
 
 private:
     int particleCount;
@@ -50,7 +50,7 @@ private:
 
     const int threadsPerBlock = 128;
 
-    int stepsSinceLastRebuild = 0;
+    uint32_t activeBlockCount = 0;
 };
 
 #endif

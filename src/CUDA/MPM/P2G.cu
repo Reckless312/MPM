@@ -1,6 +1,5 @@
 #include "P2G.h"
 
-#include <cstdio>
 
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
@@ -196,8 +195,6 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
 
                 if (blockIndex == UINT32_MAX)
                 {
-                    printf("P2G miss: particle %d pos=(%.3f,%.3f,%.3f) node=(%d,%d,%d)\n",
-                           particleIndex, positionX, positionY, positionZ, nodeX, nodeY, nodeZ);
                     continue;
                 }
 
