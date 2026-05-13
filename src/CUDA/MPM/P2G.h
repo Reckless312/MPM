@@ -8,7 +8,7 @@
 #ifdef __CUDACC__
 __device__ void ComputeBSplineWeights(float fractionalX, float fractionalY, float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3]);
 __device__ uint64_t ComputeParticleBlockCode(float positionX, float positionY, float positionZ, float cellSize);
-__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, int particleCount, const HashTable& hashTable, float cellSize, float deltaTime, float shearModulus, float firstLameParameter, float hardeningCoefficient, bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes);
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, int particleCount, const HashTable& blockCodeToIndex, float cellSize, float deltaTime, float shearModulus, float firstLameParameter, float hardeningCoefficient, bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes);
 #endif
 
 #endif

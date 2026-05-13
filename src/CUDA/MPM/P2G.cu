@@ -40,7 +40,7 @@ __device__ void ComputeBSplineWeights(const float fractionalX, const float fract
     weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }
 
-__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -170,9 +170,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
-                const float weight = sharedWeights[neighborX * weightStride + threadOffset] *
-                                     sharedWeights[(3 + neighborY) * weightStride + threadOffset] *
-                                     sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
+                const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
                 const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
                 const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
@@ -191,7 +189,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const int nodeBlockZ = nodeZ / blockSize;
 
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = Lookup(hashTable, blockCode);
+                const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
                 if (blockIndex == UINT32_MAX)
                 {

@@ -7,7 +7,7 @@
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
-__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
+__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -74,9 +74,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
-                const float weight = sharedWeights[neighborX * weightStride + threadOffset] *
-                                     sharedWeights[(3 + neighborY) * weightStride + threadOffset] *
-                                     sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
+                const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
                 const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
                 const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
@@ -87,7 +85,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const int nodeBlockZ = nodeZ / blockSize;
 
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = Lookup(hashTable, blockCode);
+                const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
                 if (blockIndex == UINT32_MAX)
                 {
@@ -135,16 +133,16 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     float newDeformationGradient[9];
     for (int row = 0; row < 3; row++)
     {
-        for (int col = 0; col < 3; col++)
+        for (int column = 0; column < 3; column++)
         {
-            float value = deformationGradient[row * 3 + col];
+            float value = deformationGradient[row * 3 + column];
 
-            for (int k = 0; k < 3; k++)
+            for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
             {
-                value += deltaTime * velocityGradient[row * 3 + k] * deformationGradient[k * 3 + col];
+                value += deltaTime * velocityGradient[row * 3 + contractionIndex] * deformationGradient[contractionIndex * 3 + column];
             }
 
-            newDeformationGradient[row * 3 + col] = value;
+            newDeformationGradient[row * 3 + column] = value;
         }
     }
 
@@ -197,6 +195,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     const bool outsideX = newCellX < (homeBlockX - 1) * blockSize || newCellX > (homeBlockX + 2) * blockSize - 3;
     const bool outsideY = newCellY < (homeBlockY - 1) * blockSize || newCellY > (homeBlockY + 2) * blockSize - 3;
+    // ReSharper disable once CppTooWideScopeInitStatement
     const bool outsideZ = newCellZ < (homeBlockZ - 1) * blockSize || newCellZ > (homeBlockZ + 2) * blockSize - 3;
 
     if (outsideX || outsideY || outsideZ)

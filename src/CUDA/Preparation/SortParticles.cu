@@ -5,7 +5,7 @@
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
-__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& hashTable, uint64_t* sortKeys, const float cellSize)
+__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys, const float cellSize)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -36,7 +36,7 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const int blockZ = cellZ / blockSize;
 
     const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
-    const uint32_t blockIndex = Lookup(hashTable, blockCode);
+    const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
     if (blockIndex == UINT32_MAX)
     {
@@ -101,7 +101,7 @@ __global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
     indices[particleIndex] = static_cast<uint32_t>(particleIndex);
 }
 
-__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable &hashTable, const float cellSize, uint64_t* particleHomeBlockCodes)
+__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable &blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes)
 {
     const int particleBlockIndex = static_cast<int>(blockIdx.x);
     const int lane = static_cast<int>(threadIdx.x);
@@ -131,7 +131,9 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
         const int blockZ = cellZ / blockSize;
 
         const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
-        const uint32_t blockIndex = Lookup(hashTable, blockCode);
+
+        // ReSharper disable once CppTooWideScopeInitStatement
+        const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
         if (blockIndex == UINT32_MAX)
         {
@@ -155,18 +157,27 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
 
     auto sourceLane = static_cast<uint32_t>(lane);
 
-    for (int k = 2; k <= 32; k <<= 1)
+    for (int mergeSize = 2; mergeSize <= 32; mergeSize <<= 1)
     {
-        for (int j = k >> 1; j > 0; j >>= 1)
+        for (int stride = mergeSize >> 1; stride > 0; stride >>= 1)
         {
-            const uint32_t partnerKey = __shfl_xor_sync(0xFFFFFFFF, key, j);
-            const uint32_t partnerSourceLane = __shfl_xor_sync(0xFFFFFFFF, sourceLane, j);
+            const uint32_t partnerKey = __shfl_xor_sync(0xFFFFFFFF, key, stride);
+            const uint32_t partnerSourceLane = __shfl_xor_sync(0xFFFFFFFF, sourceLane, stride);
 
-            const bool isLower = (lane & j) == 0;
-            const bool ascending = (lane & k) == 0;
-            const bool wantMin = (isLower == ascending);
-            // ReSharper disable once CppTooWideScope
-            const bool shouldSwap = wantMin ? (key > partnerKey) : (key < partnerKey);
+            bool shouldSwap = false;
+
+            const bool isLower = (lane & stride) == 0;
+            // ReSharper disable once CppTooWideScopeInitStatement
+            const bool ascending = (lane & mergeSize) == 0;
+
+            if ((isLower == ascending))
+            {
+                shouldSwap = (key > partnerKey);
+            }
+            else
+            {
+                shouldSwap = (key < partnerKey);
+            }
 
             if (shouldSwap)
             {
@@ -223,28 +234,25 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 
-void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& hashTable, const float cellSize, uint64_t* particleHomeBlockCodes)
+void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes)
 {
     const int particleBlockCount = (particleCount + 31) / 32;
-    WarpSortKernel<<<particleBlockCount, 32>>>(particleBlocks, particleCount, hashTable, cellSize, particleHomeBlockCodes);
+    WarpSortKernel<<<particleBlockCount, 32>>>(particleBlocks, particleCount, blockCodeToIndex, cellSize, particleHomeBlockCodes);
 }
 
-void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& hashTable, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes)
+void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes)
 {
     constexpr int threadsPerBlock = 256;
     const int threadBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
 
     InitIndicesKernel<<<threadBlocks, threadsPerBlock>>>(indices, particleCount);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 
-    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock>>>(inputBlocks, particleCount, hashTable, sortKeys, cellSize);
+    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys, cellSize);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 
     CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount));
 
     ReorderParticlesKernel<<<threadBlocks, threadsPerBlock>>>(inputBlocks, outputBlocks, sortedIndices, particleCount);
     CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
 }
