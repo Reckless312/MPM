@@ -10,6 +10,10 @@
 #include "Structures/HashTable.h"
 
 struct cudaGraphicsResource;
+struct CUstream_st;
+typedef CUstream_st* cudaStream_t;
+struct CUgraphExec_st;
+typedef CUgraphExec_st* cudaGraphExec_t;
 
 class Simulation
 {
@@ -47,6 +51,10 @@ private:
 
     cudaGraphicsResource* vboResource{};
     uint8_t* solidCells{};
+
+    cudaStream_t simulationStream{};
+    cudaGraphExec_t simulationGraphExec{};
+    bool graphValid = false;
 
     const int threadsPerBlock = 128;
 

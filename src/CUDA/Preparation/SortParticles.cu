@@ -234,25 +234,25 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 
-void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes)
+void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes, const cudaStream_t stream)
 {
     const int particleBlockCount = (particleCount + 31) / 32;
-    WarpSortKernel<<<particleBlockCount, 32>>>(particleBlocks, particleCount, blockCodeToIndex, cellSize, particleHomeBlockCodes);
+    WarpSortKernel<<<particleBlockCount, 32, 0, stream>>>(particleBlocks, particleCount, blockCodeToIndex, cellSize, particleHomeBlockCodes);
 }
 
-void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes)
+void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes, const cudaStream_t stream)
 {
     constexpr int threadsPerBlock = 256;
     const int threadBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
 
-    InitIndicesKernel<<<threadBlocks, threadsPerBlock>>>(indices, particleCount);
+    InitIndicesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(indices, particleCount);
     CUDA_CHECK(cudaGetLastError());
 
-    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys, cellSize);
+    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys, cellSize);
     CUDA_CHECK(cudaGetLastError());
 
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount));
+    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount, 0, sizeof(uint64_t) * 8, stream));
 
-    ReorderParticlesKernel<<<threadBlocks, threadsPerBlock>>>(inputBlocks, outputBlocks, sortedIndices, particleCount);
+    ReorderParticlesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, outputBlocks, sortedIndices, particleCount);
     CUDA_CHECK(cudaGetLastError());
 }

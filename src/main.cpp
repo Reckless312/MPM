@@ -160,7 +160,7 @@ int main()
 
         if (!program.IsPaused())
         {
-            for (int step = 0; step < 5; step++)
+            for (int step = 0; step < 6; step++)
             {
                 simulation.Step();
             }
