@@ -11,6 +11,8 @@
 #include "OpenGL/Program.h"
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/Particle.h"
+#include "OpenGL/Render/DepthFBO.h"
+#include "OpenGL/Render/FullscreenQuad.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/Snowfall.h"
@@ -38,11 +40,17 @@ int main()
 
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
     Shader particleShader("particleVertex.vs", "particleFragment.fs");
+    Shader particleDepthShader("particleDepthVertex.vs", "particleDepthFragment.fs");
+    Shader debugDepthShader("debugDepthVertex.vs", "debugDepthFragment.fs");
+    Shader normalReconstructShader("debugDepthVertex.vs", "normalReconstructFragment.fs");
 
     try
     {
         sceneShader.Load();
         particleShader.Load();
+        particleDepthShader.Load();
+        debugDepthShader.Load();
+        normalReconstructShader.Load();
     }
     catch (const MPMException& exception)
     {
@@ -124,6 +132,12 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
+    DepthFBO depthFBO;
+    depthFBO.Create(Program::currentWidth, Program::currentHeight);
+    Program::depthFBO = &depthFBO;
+
+    FullscreenQuad fullscreenQuad;
+
     int activeScene = 1;
 
     while (!glfwWindowShouldClose(program.window))
@@ -169,7 +183,28 @@ int main()
             simulation.SyncPositionsToVBO();
         }
 
+        depthFBO.Bind();
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        particleDepthShader.Use();
+        particleDepthShader.SetMat4("view", camera.GetViewMatrix());
+        particleDepthShader.SetMat4("projection", camera.GetProjectionMatrix());
+        particleDepthShader.SetFloat("sphereRadius", 0.012f);
+        particleDepthShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
+        snowfallParticles.Draw(particleDepthShader);
+
+        depthFBO.Unbind();
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        normalReconstructShader.Use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, depthFBO.GetDepthTexture());
+        normalReconstructShader.SetInt("depthTexture", 0);
+        normalReconstructShader.SetVec2("resolution", glm::vec2(static_cast<float>(Program::currentWidth), static_cast<float>(Program::currentHeight)));
+        normalReconstructShader.SetMat4("projection", camera.GetProjectionMatrix());
+        fullscreenQuad.Draw();
 
         if (activeScene == 1)
         {

@@ -6,6 +6,8 @@
 
 #include "Exceptions/MPMException.h"
 
+class DepthFBO;
+
 struct SceneParameters
 {
     float firstLameParameter;
@@ -26,6 +28,7 @@ public:
     /* Simulation Settings */
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
+    inline static DepthFBO* depthFBO = nullptr;
 
     inline static int maxBlocks = 16384;
     inline static int cellCountPerAxis = 256;

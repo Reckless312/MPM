@@ -23,6 +23,10 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Render/Model.h
         src/OpenGL/Render/Particle.h
         src/OpenGL/Render/Particle.cpp
+        src/OpenGL/Render/DepthFBO.h
+        src/OpenGL/Render/DepthFBO.cpp
+        src/OpenGL/Render/FullscreenQuad.h
+        src/OpenGL/Render/FullscreenQuad.cpp
         src/CUDA/Structures/HashTable.h
         src/CUDA/Structures/HashTable.cu
         src/CUDA/Structures/GridBuffer.h

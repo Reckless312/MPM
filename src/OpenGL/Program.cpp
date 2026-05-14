@@ -3,6 +3,7 @@
 
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
+#include "OpenGL/Render/DepthFBO.h"
 
 Program::Program()
 {
@@ -91,6 +92,11 @@ void Program::ResizeWindow(GLFWwindow *window, const int width, const int height
     if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
     {
         camera->UpdateProjectionMatrix();
+    }
+
+    if (Program::depthFBO != nullptr)
+    {
+        Program::depthFBO->Resize(width, height);
     }
 }
 
