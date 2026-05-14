@@ -29,6 +29,7 @@ public:
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
     inline static DepthFBO* depthFBO = nullptr;
+    inline static DepthFBO* smoothingFBO = nullptr;
 
     inline static int maxBlocks = 16384;
     inline static int cellCountPerAxis = 256;

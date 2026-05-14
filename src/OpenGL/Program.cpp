@@ -98,6 +98,11 @@ void Program::ResizeWindow(GLFWwindow *window, const int width, const int height
     {
         Program::depthFBO->Resize(width, height);
     }
+
+    if (Program::smoothingFBO != nullptr)
+    {
+        Program::smoothingFBO->Resize(width, height);
+    }
 }
 
 int Program::ReportErrorAndTerminate(const MPMException &exception)

@@ -39,18 +39,18 @@ int main()
     camera.AssignUserPointerAndSetCallbacks();
 
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
-    Shader particleShader("particleVertex.vs", "particleFragment.fs");
     Shader particleDepthShader("particleDepthVertex.vs", "particleDepthFragment.fs");
-    Shader debugDepthShader("debugDepthVertex.vs", "debugDepthFragment.fs");
-    Shader normalReconstructShader("debugDepthVertex.vs", "normalReconstructFragment.fs");
+    Shader narrowRangeFilterShader("debugDepthVertex.vs", "narrowRangeFilterFragment.fs");
+    Shader narrowRangeCleanupShader("debugDepthVertex.vs", "narrowRangeCleanupFragment.fs");
+    Shader particleShadingShader("debugDepthVertex.vs", "particleShadingFragment.fs");
 
     try
     {
         sceneShader.Load();
-        particleShader.Load();
         particleDepthShader.Load();
-        debugDepthShader.Load();
-        normalReconstructShader.Load();
+        narrowRangeFilterShader.Load();
+        narrowRangeCleanupShader.Load();
+        particleShadingShader.Load();
     }
     catch (const MPMException& exception)
     {
@@ -136,6 +136,10 @@ int main()
     depthFBO.Create(Program::currentWidth, Program::currentHeight);
     Program::depthFBO = &depthFBO;
 
+    DepthFBO smoothingFBO;
+    smoothingFBO.Create(Program::currentWidth, Program::currentHeight);
+    Program::smoothingFBO = &smoothingFBO;
+
     FullscreenQuad fullscreenQuad;
 
     int activeScene = 1;
@@ -183,35 +187,79 @@ int main()
             simulation.SyncPositionsToVBO();
         }
 
+        glm::mat4 viewMatrix = camera.GetViewMatrix();
+        glm::mat4 projMatrix = camera.GetProjectionMatrix();
+        glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
+
         depthFBO.Bind();
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         particleDepthShader.Use();
-        particleDepthShader.SetMat4("view", camera.GetViewMatrix());
-        particleDepthShader.SetMat4("projection", camera.GetProjectionMatrix());
+        particleDepthShader.SetMat4("view", viewMatrix);
+        particleDepthShader.SetMat4("projection", projMatrix);
         particleDepthShader.SetFloat("sphereRadius", 0.012f);
         particleDepthShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
         snowfallParticles.Draw(particleDepthShader);
 
         depthFBO.Unbind();
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
 
-        normalReconstructShader.Use();
+        constexpr float particleRadius = 0.012f;
+        glm::vec2 screenResolution = glm::vec2(static_cast<float>(Program::currentWidth), static_cast<float>(Program::currentHeight));
+        glm::vec2 horizontalDir = glm::vec2(1.0f / screenResolution.x, 0.0f);
+        glm::vec2 verticalDir   = glm::vec2(0.0f, 1.0f / screenResolution.y);
+        float tanHalfFov = 1.0f / projMatrix[1][1];
+
+        narrowRangeFilterShader.Use();
+        narrowRangeFilterShader.SetInt("depthTexture", 0);
+        narrowRangeFilterShader.SetVec2("resolution", screenResolution);
+        narrowRangeFilterShader.SetFloat("sigma", 0.3f * particleRadius);
+        narrowRangeFilterShader.SetFloat("delta", 5.0f * particleRadius);
+        narrowRangeFilterShader.SetFloat("mu", 0.2f * particleRadius);
+        narrowRangeFilterShader.SetFloat("tanHalfFov", tanHalfFov);
+
         glActiveTexture(GL_TEXTURE0);
+
+        // Iteration 1: H pass depthFBO -> smoothingFBO
+        smoothingFBO.Bind();
+        glClear(GL_COLOR_BUFFER_BIT);
         glBindTexture(GL_TEXTURE_2D, depthFBO.GetDepthTexture());
-        normalReconstructShader.SetInt("depthTexture", 0);
-        normalReconstructShader.SetVec2("resolution", glm::vec2(static_cast<float>(Program::currentWidth), static_cast<float>(Program::currentHeight)));
-        normalReconstructShader.SetMat4("projection", camera.GetProjectionMatrix());
+        narrowRangeFilterShader.SetVec2("blurDir", horizontalDir);
         fullscreenQuad.Draw();
+        smoothingFBO.Unbind();
+
+        // Iteration 1: V pass smoothingFBO -> depthFBO
+        depthFBO.Bind();
+        glClear(GL_COLOR_BUFFER_BIT);
+        glBindTexture(GL_TEXTURE_2D, smoothingFBO.GetDepthTexture());
+        narrowRangeFilterShader.SetVec2("blurDir", verticalDir);
+        fullscreenQuad.Draw();
+        depthFBO.Unbind();
+
+        // Cleanup pass: 2D depthFBO -> smoothingFBO
+        narrowRangeCleanupShader.Use();
+        narrowRangeCleanupShader.SetInt("depthTexture", 0);
+        narrowRangeCleanupShader.SetVec2("resolution", screenResolution);
+        narrowRangeCleanupShader.SetFloat("delta", 5.0f * particleRadius);
+        narrowRangeCleanupShader.SetFloat("mu", 0.2f * particleRadius);
+        smoothingFBO.Bind();
+        glClear(GL_COLOR_BUFFER_BIT);
+        glBindTexture(GL_TEXTURE_2D, depthFBO.GetDepthTexture());
+        fullscreenQuad.Draw();
+        smoothingFBO.Unbind();
+
+        glEnable(GL_DEPTH_TEST);
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (activeScene == 1)
         {
             sceneShader.Use();
 
-            sceneShader.SetMat4("view", camera.GetViewMatrix());
-            sceneShader.SetMat4("projection", camera.GetProjectionMatrix());
+            sceneShader.SetMat4("view", viewMatrix);
+            sceneShader.SetMat4("projection", projMatrix);
             sceneShader.SetMat4("model", logoModelMatrix);
             sceneShader.SetMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(logoModelMatrix))));
             sceneShader.SetVec3("viewPosition", camera.GetPosition());
@@ -219,19 +267,14 @@ int main()
             logoUBB.Draw(sceneShader);
         }
 
-        particleShader.Use();
-
-        glm::mat4 viewMatrix = camera.GetViewMatrix();
-        glm::mat4 projMatrix = camera.GetProjectionMatrix();
-        glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
-
-        particleShader.SetMat4("view", viewMatrix);
-        particleShader.SetMat4("projection", projMatrix);
-        particleShader.SetFloat("sphereRadius", 0.012f);
-        particleShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
-        particleShader.SetVec3("lightDirEye", lightDirEye);
-
-        snowfallParticles.Draw(particleShader);
+        particleShadingShader.Use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, smoothingFBO.GetDepthTexture());
+        particleShadingShader.SetInt("depthTexture", 0);
+        particleShadingShader.SetVec2("resolution", glm::vec2(static_cast<float>(Program::currentWidth), static_cast<float>(Program::currentHeight)));
+        particleShadingShader.SetMat4("projection", projMatrix);
+        particleShadingShader.SetVec3("lightDirEye", lightDirEye);
+        fullscreenQuad.Draw();
 
         glfwSwapBuffers(program.window);
         glfwPollEvents();
