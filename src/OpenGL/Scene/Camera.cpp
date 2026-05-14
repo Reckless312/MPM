@@ -7,14 +7,10 @@ Camera::Camera(GLFWwindow* window)
 {
     this->window = window;
 
-    int initialWindowWidth, initialWindowHeight;
-    glfwGetWindowSize(this->window, &initialWindowWidth, &initialWindowHeight);
-
-    this->windowWidth = static_cast<float>(initialWindowWidth);
-    this->windowHeight = static_cast<float>(initialWindowHeight);
-
-    this->mouseXDirection = this->windowWidth / 2.0f;
-    this->mouseYDirection = this->windowHeight / 2.0f;
+    int framebufferWidth, framebufferHeight;
+    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
+    this->mouseXDirection = static_cast<float>(framebufferWidth) / 2.0f;
+    this->mouseYDirection = static_cast<float>(framebufferHeight) / 2.0f;
 
     this->position = glm::vec3(0.0f, 0.0f, 3.0f);
     this->front = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -37,7 +33,10 @@ void Camera::UpdateViewMatrix()
 
 void Camera::UpdateProjectionMatrix()
 {
-    this->projectionMatrix = glm::perspective(glm::radians(this->fov),  this->windowWidth / this->windowHeight, this->nearPlane, this->farPlane);
+    int framebufferWidth, framebufferHeight;
+    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
+    float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+    this->projectionMatrix = glm::perspective(glm::radians(this->fov), aspectRatio, this->nearPlane, this->farPlane);
 }
 
 void Camera::UpdateSpeed(const float deltaTime)

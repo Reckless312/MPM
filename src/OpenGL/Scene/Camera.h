@@ -3,6 +3,7 @@
 
 #include <GLFW/glfw3.h>
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 class Camera
 {
@@ -13,6 +14,7 @@ public:
     void UpdateSpeed(float deltaTime);
     void AssignUserPointerAndSetCallbacks();
     void SetInitialOrientation(glm::vec3 desiredPosition, float desiredYaw, float desiredPitch);
+    void UpdateProjectionMatrix();
 
     [[nodiscard]] glm::vec3 GetPosition() const;
 
@@ -33,8 +35,6 @@ private:
     glm::mat4 viewMatrix{};
     glm::mat4 projectionMatrix{};
 
-    float windowWidth;
-    float windowHeight;
     float mouseXDirection;
     float mouseYDirection;
 
@@ -59,7 +59,6 @@ private:
     void UpdateDirection();
     void UpdateViewMatrix();
     void UpdateRightVector();
-    void UpdateProjectionMatrix();
     void UpdateFov(float yOffset);
     void UpdatePitch(float yDirectionOffset);
     void UpdateMousePosition(float currentXDirection, float currentYDirection);

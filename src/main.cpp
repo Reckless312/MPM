@@ -193,7 +193,7 @@ int main()
         particleShader.SetMat4("view", viewMatrix);
         particleShader.SetMat4("projection", projMatrix);
         particleShader.SetFloat("sphereRadius", 0.012f);
-        particleShader.SetFloat("viewportHeight", 600.0f);
+        particleShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
         particleShader.SetVec3("lightDirEye", lightDirEye);
 
         snowfallParticles.Draw(particleShader);
