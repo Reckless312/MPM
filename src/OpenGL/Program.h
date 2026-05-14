@@ -24,6 +24,9 @@ public:
     float deltaTime = 0.0f;
 
     /* Simulation Settings */
+    inline static int currentWidth = 800;
+    inline static int currentHeight = 600;
+
     inline static int maxBlocks = 16384;
     inline static int cellCountPerAxis = 256;
     inline static float cellSize = 0.02f;

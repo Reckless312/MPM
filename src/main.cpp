@@ -185,8 +185,15 @@ int main()
 
         particleShader.Use();
 
-        particleShader.SetMat4("view", camera.GetViewMatrix());
-        particleShader.SetMat4("projection", camera.GetProjectionMatrix());
+        glm::mat4 viewMatrix = camera.GetViewMatrix();
+        glm::mat4 projMatrix = camera.GetProjectionMatrix();
+        glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
+
+        particleShader.SetMat4("view", viewMatrix);
+        particleShader.SetMat4("projection", projMatrix);
+        particleShader.SetFloat("sphereRadius", 0.012f);
+        particleShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
+        particleShader.SetVec3("lightDirEye", lightDirEye);
 
         snowfallParticles.Draw(particleShader);
 

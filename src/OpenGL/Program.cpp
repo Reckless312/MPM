@@ -2,6 +2,7 @@
 #include <ostream>
 
 #include "Program.h"
+#include "OpenGL/Scene/Camera.h"
 
 Program::Program()
 {
@@ -84,6 +85,13 @@ bool Program::IsPaused() const
 void Program::ResizeWindow(GLFWwindow *window, const int width, const int height)
 {
     glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, width, height);
+    Program::currentWidth = width;
+    Program::currentHeight = height;
+
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
+    {
+        camera->UpdateProjectionMatrix();
+    }
 }
 
 int Program::ReportErrorAndTerminate(const MPMException &exception)
