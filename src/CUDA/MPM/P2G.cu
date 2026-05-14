@@ -114,7 +114,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
         a[componentIndex] = deformationGradient[componentIndex] - r[componentIndex];
     }
 
-    const float hardening = expf(hardeningCoefficient * (1.0f - plasticVolume));
+    const float hardening = expf(fmaxf(-10.0f, fminf(hardeningCoefficient * (1.0f - plasticVolume), 10.0f)));
     const float effectiveShearModulus = shearModulus * hardening;
     const float effectiveFirstLameParameter = firstLameParameter * hardening;
     const float volumetricStress = effectiveFirstLameParameter * (J - 1.0f) * J;
