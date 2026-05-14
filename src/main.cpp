@@ -122,6 +122,7 @@ int main()
     camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 7.5f), -90.0f, 0.0f);
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     int activeScene = 1;
 
@@ -185,8 +186,15 @@ int main()
 
         particleShader.Use();
 
-        particleShader.SetMat4("view", camera.GetViewMatrix());
-        particleShader.SetMat4("projection", camera.GetProjectionMatrix());
+        glm::mat4 viewMatrix = camera.GetViewMatrix();
+        glm::mat4 projMatrix = camera.GetProjectionMatrix();
+        glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
+
+        particleShader.SetMat4("view", viewMatrix);
+        particleShader.SetMat4("projection", projMatrix);
+        particleShader.SetFloat("sphereRadius", 0.012f);
+        particleShader.SetFloat("viewportHeight", 600.0f);
+        particleShader.SetVec3("lightDirEye", lightDirEye);
 
         snowfallParticles.Draw(particleShader);
 
