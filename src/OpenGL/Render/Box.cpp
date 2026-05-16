@@ -1,7 +1,7 @@
 #include "OpenGL/Render/Box.h"
 
-Box::Box(glm::vec3 center, glm::vec3 halfExtents)
-    : mesh(BuildMesh(center, halfExtents))
+Box::Box(glm::vec3 halfExtents)
+    : mesh(BuildMesh(halfExtents))
 {
 }
 
@@ -10,43 +10,41 @@ void Box::Draw(const Shader& shader) const
     mesh.Draw(shader);
 }
 
-Mesh Box::BuildMesh(glm::vec3 center, glm::vec3 halfExtents)
+Mesh Box::BuildMesh(glm::vec3 halfExtents)
 {
-    const glm::vec3 c = center;
     const glm::vec3 h = halfExtents;
 
-    // 24 vertices (4 per face, 6 faces) with per-face normals
     std::vector<Vertex> vertices = {
         // +X
-        {{c.x+h.x, c.y-h.y, c.z-h.z}, {1,0,0}, {0,0}},
-        {{c.x+h.x, c.y+h.y, c.z-h.z}, {1,0,0}, {0,1}},
-        {{c.x+h.x, c.y+h.y, c.z+h.z}, {1,0,0}, {1,1}},
-        {{c.x+h.x, c.y-h.y, c.z+h.z}, {1,0,0}, {1,0}},
+        {{h.x, -h.y, -h.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{h.x,  h.y, -h.z}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+        {{h.x,  h.y,  h.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        {{h.x, -h.y,  h.z}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
         // -X
-        {{c.x-h.x, c.y-h.y, c.z+h.z}, {-1,0,0}, {0,0}},
-        {{c.x-h.x, c.y+h.y, c.z+h.z}, {-1,0,0}, {0,1}},
-        {{c.x-h.x, c.y+h.y, c.z-h.z}, {-1,0,0}, {1,1}},
-        {{c.x-h.x, c.y-h.y, c.z-h.z}, {-1,0,0}, {1,0}},
+        {{-h.x, -h.y,  h.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        {{-h.x,  h.y,  h.z}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+        {{-h.x,  h.y, -h.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        {{-h.x, -h.y, -h.z}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
         // +Y
-        {{c.x-h.x, c.y+h.y, c.z-h.z}, {0,1,0}, {0,0}},
-        {{c.x-h.x, c.y+h.y, c.z+h.z}, {0,1,0}, {0,1}},
-        {{c.x+h.x, c.y+h.y, c.z+h.z}, {0,1,0}, {1,1}},
-        {{c.x+h.x, c.y+h.y, c.z-h.z}, {0,1,0}, {1,0}},
+        {{-h.x, h.y, -h.z}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{-h.x, h.y,  h.z}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+        {{ h.x, h.y,  h.z}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+        {{ h.x, h.y, -h.z}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
         // -Y
-        {{c.x-h.x, c.y-h.y, c.z+h.z}, {0,-1,0}, {0,0}},
-        {{c.x-h.x, c.y-h.y, c.z-h.z}, {0,-1,0}, {0,1}},
-        {{c.x+h.x, c.y-h.y, c.z-h.z}, {0,-1,0}, {1,1}},
-        {{c.x+h.x, c.y-h.y, c.z+h.z}, {0,-1,0}, {1,0}},
+        {{-h.x, -h.y,  h.z}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{-h.x, -h.y, -h.z}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
+        {{ h.x, -h.y, -h.z}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+        {{ h.x, -h.y,  h.z}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
         // +Z
-        {{c.x-h.x, c.y-h.y, c.z+h.z}, {0,0,1}, {0,0}},
-        {{c.x+h.x, c.y-h.y, c.z+h.z}, {0,0,1}, {0,1}},
-        {{c.x+h.x, c.y+h.y, c.z+h.z}, {0,0,1}, {1,1}},
-        {{c.x-h.x, c.y+h.y, c.z+h.z}, {0,0,1}, {1,0}},
+        {{-h.x, -h.y, h.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        {{ h.x, -h.y, h.z}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{ h.x,  h.y, h.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        {{-h.x,  h.y, h.z}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
         // -Z
-        {{c.x+h.x, c.y-h.y, c.z-h.z}, {0,0,-1}, {0,0}},
-        {{c.x-h.x, c.y-h.y, c.z-h.z}, {0,0,-1}, {0,1}},
-        {{c.x-h.x, c.y+h.y, c.z-h.z}, {0,0,-1}, {1,1}},
-        {{c.x+h.x, c.y+h.y, c.z-h.z}, {0,0,-1}, {1,0}},
+        {{ h.x, -h.y, -h.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+        {{-h.x, -h.y, -h.z}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+        {{-h.x,  h.y, -h.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+        {{ h.x,  h.y, -h.z}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
     };
 
     std::vector<unsigned int> indices;
@@ -54,7 +52,7 @@ Mesh Box::BuildMesh(glm::vec3 center, glm::vec3 halfExtents)
 
     for (unsigned int face = 0; face < 6; face++)
     {
-        unsigned int base = face * 4;
+        const unsigned int base = face * 4;
         indices.push_back(base + 0);
         indices.push_back(base + 1);
         indices.push_back(base + 2);

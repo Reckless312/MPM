@@ -13,7 +13,7 @@ public:
     std::vector<glm::vec3> initialPositions{};
     std::vector<ParticleBlock> initialBlocks{};
 
-    int particleCount = 100000;
+    int particleCount = 1000000;
 
     void BuildInitialPositions();
     void BuildParticleBlocks();

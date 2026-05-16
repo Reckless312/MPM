@@ -26,6 +26,8 @@ public:
     void SyncPositionsToVBO();
     void UploadMeshBoundary(const MeshSDF& sdf) const;
     void ClearMeshBoundary() const;
+    void SetBoxBoundary(glm::vec3 center, glm::vec3 halfExtents, glm::vec3 velocity) const;
+    void ClearBoxBoundary() const;
     void Reset(const ParticleBlock* initialBlocks, int blockCount) const;
 
 private:
@@ -54,6 +56,10 @@ private:
     cudaGraphicsResource* vboResource{};
     float* sdfDistances{};
     glm::vec3* sdfNormals{};
+
+    glm::vec3* boxCenter{};
+    glm::vec3* boxHalfExtents{};
+    glm::vec3* boxVelocity{};
 
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};

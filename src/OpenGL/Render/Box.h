@@ -9,14 +9,14 @@
 class Box
 {
 public:
-    Box(glm::vec3 center, glm::vec3 halfExtents);
+    explicit Box(glm::vec3 halfExtents);
 
     void Draw(const Shader& shader) const;
 
 private:
     Mesh mesh;
 
-    static Mesh BuildMesh(glm::vec3 center, glm::vec3 halfExtents);
+    static Mesh BuildMesh(glm::vec3 halfExtents);
 };
 
 #endif

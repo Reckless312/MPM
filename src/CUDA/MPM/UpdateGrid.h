@@ -8,7 +8,7 @@
 #include "../Structures/GridBuffer.h"
 
 #ifdef __CUDACC__
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, int totalBlocks, float deltaTime, float gravity, int gridSizeInCells, float boundaryFriction, float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals);
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, int totalBlocks, float deltaTime, float gravity, int gridSizeInCells, float boundaryFriction, float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals, const glm::vec3* boxCenter, const glm::vec3* boxHalfExtents, const glm::vec3* boxVelocity);
 #endif
 
 #endif

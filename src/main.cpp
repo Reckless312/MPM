@@ -85,10 +85,10 @@ int main()
         .criticalStretch = 0.0075f
     };
 
-    constexpr SceneParameters crawlingSceneParameters = {
-        .firstLameParameter = 0.889e4f,
-        .secondLameParameter = 1.333e4f,
-        .hardeningCoefficient = 10.0f,
+    constexpr SceneParameters snowGroundSceneParameters = {
+        .firstLameParameter = 1.5e4f,
+        .secondLameParameter = 2.5e4f,
+        .hardeningCoefficient = 3.0f,
         .criticalCompression = 0.025f,
         .criticalStretch = 0.0075f
     };
@@ -119,7 +119,10 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Box box(glm::vec3(2.56f, 0.2f, 0.7f), glm::vec3(0.2f, 0.2f, 0.2f));
+    const glm::vec3 boxHalfExtents(0.2f, 0.2f, 0.2f);
+    float boxCenterZ = 0.7f;
+
+    Box box(boxHalfExtents);
 
     Particle snowfallParticles(snowfall.initialPositions);
 
@@ -150,6 +153,7 @@ int main()
         {
             activeScene = 1;
             Program::ApplySceneParameters(snowfallSceneParameters);
+            simulation.ClearBoxBoundary();
             simulation.UploadMeshBoundary(solidCells);
             simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
         }
@@ -157,9 +161,10 @@ int main()
         if (program.WasSecondSceneSelected())
         {
             activeScene = 2;
-            Program::ApplySceneParameters(crawlingSceneParameters);
+            Program::ApplySceneParameters(snowGroundSceneParameters);
             simulation.ClearMeshBoundary();
             simulation.Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()));
+            boxCenterZ = 0.7f;
         }
 
         if (program.WasPauseKeyPressed())
@@ -177,8 +182,23 @@ int main()
 
         if (!program.IsPaused())
         {
+            constexpr float boxSpeed = 3.0f;
+            constexpr float boxMaxZ = 3.8f;
+
             for (int step = 0; step < 6; step++)
             {
+                if (activeScene == 2)
+                {
+                    if (boxCenterZ < boxMaxZ)
+                    {
+                        boxCenterZ += boxSpeed * Program::physicsTimeStep;
+                    }
+
+                    const glm::vec3 boxCenter(2.56f, boxHalfExtents.y, boxCenterZ);
+                    const glm::vec3 currentBoxVelocity = boxCenterZ < boxMaxZ ? glm::vec3(0.0f, 0.0f, boxSpeed) : glm::vec3(0.0f);
+                    simulation.SetBoxBoundary(boxCenter, boxHalfExtents, currentBoxVelocity);
+                }
+
                 simulation.Step();
             }
 
@@ -203,7 +223,8 @@ int main()
 
         if (activeScene == 2)
         {
-            const glm::mat4 boxModelMatrix = glm::mat4(1.0f);
+            const glm::vec3 boxCenter(2.56f, boxHalfExtents.y, boxCenterZ);
+            const glm::mat4 boxModelMatrix = glm::translate(glm::mat4(1.0f), boxCenter);
 
             sceneShader.SetMat4("model", boxModelMatrix);
             sceneShader.SetMat3("normalMatrix", glm::mat3(1.0f));
