@@ -1,9 +1,8 @@
 #include "UpdateGrid.h"
 #include "../Structures/Morton.h"
 #include "../Preparation/RebuildMapping.h"
-#include <cuda_runtime.h>
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction, const uint8_t* solidCells)
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction, const float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -95,11 +94,22 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
         velocityY *= tangentialScale;
     }
 
-    if (solidCells[nodeGridZ * gridSizeInCells * gridSizeInCells + nodeGridY * gridSizeInCells + nodeGridX])
+    const int sdfIndex = nodeGridZ * gridSizeInCells * gridSizeInCells + nodeGridY * gridSizeInCells + nodeGridX;
+
+    if (sdfDistances[sdfIndex] < cellSize)
     {
-        velocityX = 0.0f;
-        velocityY = 0.0f;
-        velocityZ = 0.0f;
+        const glm::vec3 normal = sdfNormals[sdfIndex];
+        const float normalComponent = velocityX * normal.x + velocityY * normal.y + velocityZ * normal.z;
+
+        if (normalComponent < 0.0f)
+        {
+            velocityX -= normalComponent * normal.x;
+            velocityY -= normalComponent * normal.y;
+            velocityZ -= normalComponent * normal.z;
+            velocityX *= tangentialScale;
+            velocityY *= tangentialScale;
+            velocityZ *= tangentialScale;
+        }
     }
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;

@@ -2,15 +2,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include <glm/glm.hpp>
 
-float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
+glm::vec3 MeshBoundary::ClosestPointOnTriangle(glm::vec3 point, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
 {
-    // v - vertex
-    // e - edge
-    // I hate names on this function
-
     // 7 Voronoi Regions
 
     // Vertices
@@ -23,7 +20,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
 
     if (v0ToPointProjectionE0 <= 0.0f && v0ToPointProjectionE1 <= 0.0f)
     {
-        return glm::length(point - v0);
+        return v0;
     }
 
     glm::vec3 v1ToPoint = point - v1;
@@ -33,7 +30,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
 
     if (v1ToPointProjectionE0 >= 0.0f && v1ToPointProjectionE1 <= v1ToPointProjectionE0)
     {
-        return glm::length(point - v1);
+        return v1;
     }
 
     glm::vec3 v2ToPoint = point - v2;
@@ -43,7 +40,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
 
     if (v2ToPointProjectionE1 >= 0.0f && v2ToPointProjectionE0 <= v2ToPointProjectionE1)
     {
-        return glm::length(point - v2);
+        return v2;
     }
 
     // Edges
@@ -52,7 +49,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
     if (unnormalizedWeightV2 <= 0.0f && v0ToPointProjectionE0 >= 0.0f && v1ToPointProjectionE0 <= 0.0f)
     {
         float fractionAlongE0 = v0ToPointProjectionE0 / (v0ToPointProjectionE0 - v1ToPointProjectionE0);
-        return glm::length(point - (v0 + fractionAlongE0 * e0));
+        return v0 + fractionAlongE0 * e0;
     }
 
     float unnormalizedWeightV1 = v2ToPointProjectionE0 * v0ToPointProjectionE1 - v0ToPointProjectionE0 * v2ToPointProjectionE1;
@@ -60,7 +57,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
     if (unnormalizedWeightV1 <= 0.0f && v0ToPointProjectionE1 >= 0.0f && v2ToPointProjectionE1 <= 0.0f)
     {
         float fractionAlongE1 = v0ToPointProjectionE1 / (v0ToPointProjectionE1 - v2ToPointProjectionE1);
-        return glm::length(point - (v0 + fractionAlongE1 * e1));
+        return v0 + fractionAlongE1 * e1;
     }
 
     float unnormalizedWeightV0 = v1ToPointProjectionE0 * v2ToPointProjectionE1 - v2ToPointProjectionE0 * v1ToPointProjectionE1;
@@ -68,7 +65,7 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
     if (unnormalizedWeightV0 <= 0.0f && (v1ToPointProjectionE1 - v1ToPointProjectionE0) >= 0.0f && (v2ToPointProjectionE0 - v2ToPointProjectionE1) >= 0.0f)
     {
         float fractionAlongV1ToV2 = (v1ToPointProjectionE1 - v1ToPointProjectionE0) / ((v1ToPointProjectionE1 - v1ToPointProjectionE0) + (v2ToPointProjectionE0 - v2ToPointProjectionE1));
-        return glm::length(point - (v1 + fractionAlongV1ToV2 * (v2 - v1)));
+        return v1 + fractionAlongV1ToV2 * (v2 - v1);
     }
 
     // Inside the triangle
@@ -77,12 +74,17 @@ float MeshBoundary::PointTriangleDistance(glm::vec3 point, glm::vec3 v0, glm::ve
     float normalizedWeightV1 = unnormalizedWeightV1 * inverseBarycentricSum;
     float normalizedWeightV2 = unnormalizedWeightV2 * inverseBarycentricSum;
 
-    return glm::length(point - (v0 + e0 * normalizedWeightV1 + e1 * normalizedWeightV2));
+    return v0 + e0 * normalizedWeightV1 + e1 * normalizedWeightV2;
 }
 
-std::vector<uint8_t> MeshBoundary::Voxelize(const std::vector<std::array<glm::vec3, 3>>& triangles, const int cellCountPerAxis, const float cellSize)
+MeshSDF MeshBoundary::Voxelize(const std::vector<std::array<glm::vec3, 3>>& triangles, const int cellCountPerAxis, const float cellSize)
 {
-    std::vector<uint8_t> solidCells(cellCountPerAxis * cellCountPerAxis * cellCountPerAxis, false);
+    const int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
+    const float narrowBand = 4.0f * cellSize;
+
+    MeshSDF sdf;
+    sdf.distances.assign(nodeCount, std::numeric_limits<float>::max());
+    sdf.normals.assign(nodeCount, glm::vec3(0.0f));
 
     for (const auto& triangle : triangles)
     {
@@ -90,16 +92,18 @@ std::vector<uint8_t> MeshBoundary::Voxelize(const std::vector<std::array<glm::ve
         const glm::vec3& v1 = triangle[1];
         const glm::vec3& v2 = triangle[2];
 
+        const glm::vec3 triangleNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+
         const glm::vec3 boundsMin = glm::min(glm::min(v0, v1), v2);
         const glm::vec3 boundsMax = glm::max(glm::max(v0, v1), v2);
 
-        const int cellXMin = std::max(0, static_cast<int>(std::floor(boundsMin.x / cellSize)) - 1);
-        const int cellYMin = std::max(0, static_cast<int>(std::floor(boundsMin.y / cellSize)) - 1);
-        const int cellZMin = std::max(0, static_cast<int>(std::floor(boundsMin.z / cellSize)) - 1);
+        const int cellXMin = std::max(0, static_cast<int>(std::floor((boundsMin.x - narrowBand) / cellSize)));
+        const int cellYMin = std::max(0, static_cast<int>(std::floor((boundsMin.y - narrowBand) / cellSize)));
+        const int cellZMin = std::max(0, static_cast<int>(std::floor((boundsMin.z - narrowBand) / cellSize)));
 
-        const int cellXMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil(boundsMax.x / cellSize)) + 1);
-        const int cellYMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil(boundsMax.y / cellSize)) + 1);
-        const int cellZMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil(boundsMax.z / cellSize)) + 1);
+        const int cellXMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.x + narrowBand) / cellSize)));
+        const int cellYMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.y + narrowBand) / cellSize)));
+        const int cellZMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.z + narrowBand) / cellSize)));
 
         for (int z = cellZMin; z <= cellZMax; z++)
         {
@@ -107,17 +111,28 @@ std::vector<uint8_t> MeshBoundary::Voxelize(const std::vector<std::array<glm::ve
             {
                 for (int x = cellXMin; x <= cellXMax; x++)
                 {
-                    // ReSharper disable once CppTooWideScopeInitStatement
-                    const glm::vec3 nodeWorldPosition(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, static_cast<float>(z) * cellSize);
+                    const glm::vec3 nodePosition(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, static_cast<float>(z) * cellSize);
+                    const glm::vec3 closestPoint = ClosestPointOnTriangle(nodePosition, v0, v1, v2);
+                    const glm::vec3 toNode = nodePosition - closestPoint;
+                    const float distance = glm::length(toNode);
 
-                    if (PointTriangleDistance(nodeWorldPosition, v0, v1, v2) < cellSize)
+                    if (distance >= narrowBand)
                     {
-                        solidCells[z * cellCountPerAxis * cellCountPerAxis + y * cellCountPerAxis + x] = 1;
+                        continue;
+                    }
+
+                    const int index = z * cellCountPerAxis * cellCountPerAxis + y * cellCountPerAxis + x;
+
+                    if (distance < std::abs(sdf.distances[index]))
+                    {
+                        const float sign = glm::dot(toNode, triangleNormal) >= 0.0f ? 1.0f : -1.0f;
+                        sdf.distances[index] = sign * distance;
+                        sdf.normals[index] = triangleNormal;
                     }
                 }
             }
         }
     }
 
-    return solidCells;
+    return sdf;
 }

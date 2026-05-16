@@ -1,13 +1,15 @@
 #ifndef MPM_METHOD_SIMULATION_H
 #define MPM_METHOD_SIMULATION_H
 
-#include <cstdint>
 #include <cstddef>
 #include <vector>
+
+#include <glm/vec3.hpp>
 
 #include "Structures/ParticleBuffer.h"
 #include "Structures/GridBuffer.h"
 #include "Structures/HashTable.h"
+#include "OpenGL/Simulation/MeshBoundary.h"
 
 struct cudaGraphicsResource;
 struct CUstream_st;
@@ -22,7 +24,7 @@ public:
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
-    void UploadMeshBoundary(const std::vector<uint8_t>& solidCellsHost) const;
+    void UploadMeshBoundary(const MeshSDF& sdf) const;
     void ClearMeshBoundary() const;
     void Reset(const ParticleBlock* initialBlocks, int blockCount) const;
 
@@ -50,7 +52,8 @@ private:
     size_t nvidiaCUBTemporaryStorageBytes = 0;
 
     cudaGraphicsResource* vboResource{};
-    uint8_t* solidCells{};
+    float* sdfDistances{};
+    glm::vec3* sdfNormals{};
 
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};

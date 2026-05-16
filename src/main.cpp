@@ -76,8 +76,8 @@ int main()
     }
 
     constexpr SceneParameters snowfallSceneParameters = {
-        .firstLameParameter = 1.333e4f,
-        .secondLameParameter = 2.0e4f,
+        .firstLameParameter = 3.889e4f,
+        .secondLameParameter = 5.833e4f,
         .hardeningCoefficient = 10.0f,
         .criticalCompression = 0.025f,
         .criticalStretch = 0.0075f
@@ -115,7 +115,7 @@ int main()
     const glm::mat4 logoModelMatrix = logoTranslation * logoRotation;
 
     std::vector<std::array<glm::vec3, 3>> logoTriangles = logoUBB.GetTriangles(logoModelMatrix);
-    std::vector<uint8_t> solidCells = MeshBoundary::Voxelize(logoTriangles, Program::cellCountPerAxis, Program::cellSize);
+    MeshSDF solidCells = MeshBoundary::Voxelize(logoTriangles, Program::cellCountPerAxis, Program::cellSize);
 
     simulation.UploadMeshBoundary(solidCells);
 
