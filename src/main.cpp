@@ -10,10 +10,12 @@
 #include "Exceptions/MPMException.h"
 #include "OpenGL/Program.h"
 #include "OpenGL/Render/Model.h"
+#include "OpenGL/Render/Box.h"
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/Snowfall.h"
+#include "OpenGL/Simulation/SnowLayer.h"
 
 int main()
 {
@@ -105,6 +107,20 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
+    SnowLayer snowLayer;
+
+    try
+    {
+        snowLayer.BuildInitialPositions();
+        snowLayer.BuildParticleBlocks();
+    }
+    catch (const MPMException& exception)
+    {
+        return Program::ReportErrorAndTerminate(exception);
+    }
+
+    Box box(glm::vec3(2.56f, 0.2f, 0.7f), glm::vec3(0.2f, 0.2f, 0.2f));
+
     Particle snowfallParticles(snowfall.initialPositions);
 
     Simulation simulation(snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfallParticles.GetVBO());
@@ -143,7 +159,7 @@ int main()
             activeScene = 2;
             Program::ApplySceneParameters(crawlingSceneParameters);
             simulation.ClearMeshBoundary();
-            simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
+            simulation.Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()));
         }
 
         if (program.WasPauseKeyPressed())
@@ -171,17 +187,29 @@ int main()
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        sceneShader.Use();
+        sceneShader.SetMat4("view", camera.GetViewMatrix());
+        sceneShader.SetMat4("projection", camera.GetProjectionMatrix());
+        sceneShader.SetVec3("viewPosition", camera.GetPosition());
+
         if (activeScene == 1)
         {
-            sceneShader.Use();
-
-            sceneShader.SetMat4("view", camera.GetViewMatrix());
-            sceneShader.SetMat4("projection", camera.GetProjectionMatrix());
             sceneShader.SetMat4("model", logoModelMatrix);
             sceneShader.SetMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(logoModelMatrix))));
-            sceneShader.SetVec3("viewPosition", camera.GetPosition());
+            sceneShader.SetVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
             logoUBB.Draw(sceneShader);
+        }
+
+        if (activeScene == 2)
+        {
+            const glm::mat4 boxModelMatrix = glm::mat4(1.0f);
+
+            sceneShader.SetMat4("model", boxModelMatrix);
+            sceneShader.SetMat3("normalMatrix", glm::mat3(1.0f));
+            sceneShader.SetVec3("objectColor", glm::vec3(0.2f, 0.4f, 0.9f));
+
+            box.Draw(sceneShader);
         }
 
         particleShader.Use();

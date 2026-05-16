@@ -149,7 +149,7 @@ vec3 CalculateSpotLight(SpotLight light, vec3 normal, vec3 fragmentPosition, vec
 
 vec3 CalculateRegularAmbient(vec3 lightAmbient)
 {
-    vec3 color = vec3(1.0);
+    vec3 color = objectColor;
 
     if (hasDiffuseTexture)
     {
@@ -163,7 +163,7 @@ vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse
 {
     float diffuseImpact = max(dot(normal, lightDirection), 0.0);
 
-    vec3 color = vec3(1.0);
+    vec3 color = objectColor;
 
     if (hasDiffuseTexture)
     {
@@ -175,6 +175,11 @@ vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse
 
 vec3 CalculateRegularSpecular(vec3 normal, vec3 lightDirection, vec3 lightSpecular, vec3 viewDirection)
 {
+    if (!hasDiffuseTexture)
+    {
+        return vec3(0.0);
+    }
+
     vec3 reflectionDirection = reflect(-lightDirection, normal);
 
     float specularImpact = pow(max(dot(viewDirection, reflectionDirection), 0.0), material.shininess);

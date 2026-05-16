@@ -48,6 +48,10 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/Snowfall.cpp
         src/OpenGL/Simulation/Snowfall.h
+        src/OpenGL/Simulation/SnowLayer.cpp
+        src/OpenGL/Simulation/SnowLayer.h
+        src/OpenGL/Render/Box.cpp
+        src/OpenGL/Render/Box.h
         src/OpenGL/Render/RenderObject.cpp
 )
 
