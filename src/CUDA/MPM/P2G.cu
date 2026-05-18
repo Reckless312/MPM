@@ -180,6 +180,11 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
+                if (nodeX < 0 || nodeY < 0 || nodeZ < 0)
+                {
+                    continue;
+                }
+
                 const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
                 const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;

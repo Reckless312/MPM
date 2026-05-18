@@ -53,6 +53,8 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Render/Box.cpp
         src/OpenGL/Render/Box.h
         src/OpenGL/Render/RenderObject.cpp
+        src/OpenGL/Render/VideoRecorder.h
+        src/OpenGL/Render/VideoRecorder.cpp
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

@@ -14,12 +14,15 @@
 #include <utility>
 #include "OpenGL/Program.h"
 
-Simulation::Simulation(const int particleCount, const ParticleBlock* initialParticleBlocks, const int particleBlockCount, const unsigned int vbo)
+Simulation::Simulation(const int maxParticleCount, const int initialParticleCount, const ParticleBlock* initialParticleBlocks, const int initialParticleBlockCount, const unsigned int vbo)
 {
-    this->particleCount = particleCount;
+    this->particleCount = initialParticleCount;
+    this->allocatedParticleCount = maxParticleCount;
 
-    CUDA_CHECK(cudaMalloc(&this->particleBlocks, particleBlockCount * sizeof(ParticleBlock)));
-    CUDA_CHECK(cudaMalloc(&this->particleBlocksSortingBuffer, particleBlockCount * sizeof(ParticleBlock)));
+    const int maxParticleBlockCount = (maxParticleCount + 31) / 32;
+
+    CUDA_CHECK(cudaMalloc(&this->particleBlocks, maxParticleBlockCount * sizeof(ParticleBlock)));
+    CUDA_CHECK(cudaMalloc(&this->particleBlocksSortingBuffer, maxParticleBlockCount * sizeof(ParticleBlock)));
 
     CUDA_CHECK(cudaMalloc(&this->gridBlocks, Program::maxBlocks * sizeof(GridBlock)));
 
@@ -30,21 +33,21 @@ Simulation::Simulation(const int particleCount, const ParticleBlock* initialPart
     CUDA_CHECK(cudaMalloc(&this->nextBlockIndex, sizeof(uint32_t)));
     CUDA_CHECK(cudaMalloc(&this->blockCodes, Program::maxBlocks * sizeof(uint64_t)));
 
-    CUDA_CHECK(cudaMalloc(&this->particleSortKeys, particleCount * sizeof(uint64_t)));
-    CUDA_CHECK(cudaMalloc(&this->particleSortKeysResult, particleCount * sizeof(uint64_t)));
-    CUDA_CHECK(cudaMalloc(&this->particleIndices, particleCount * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMalloc(&this->particleSortKeys, maxParticleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&this->particleSortKeysResult, maxParticleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&this->particleIndices, maxParticleCount * sizeof(uint32_t)));
 
-    CUDA_CHECK(cudaMalloc(&this->sortedParticleIndices, particleCount * sizeof(uint32_t)));
-    CUDA_CHECK(cudaMemcpy(this->particleBlocks, initialParticleBlocks, particleBlockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMalloc(&this->sortedParticleIndices, maxParticleCount * sizeof(uint32_t)));
+    CUDA_CHECK(cudaMemcpy(this->particleBlocks, initialParticleBlocks, initialParticleBlockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cudaMalloc(&this->particleHomeBlockCodes, particleCount * sizeof(uint64_t)));
-    CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, particleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMalloc(&this->particleHomeBlockCodes, maxParticleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, initialParticleCount * sizeof(uint64_t)));
 
     CUDA_CHECK(cudaMalloc(&this->rebuildFlag, sizeof(uint32_t)));
     constexpr uint32_t initialRebuildFlag = 1u;
     CUDA_CHECK(cudaMemcpy(this->rebuildFlag, &initialRebuildFlag, sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(nullptr, this->nvidiaCUBTemporaryStorageBytes, this->particleSortKeys, this->particleSortKeysResult, this->particleIndices, this->sortedParticleIndices, particleCount));
+    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(nullptr, this->nvidiaCUBTemporaryStorageBytes, this->particleSortKeys, this->particleSortKeysResult, this->particleIndices, this->sortedParticleIndices, maxParticleCount));
 
     CUDA_CHECK(cudaMalloc(&this->nvidiaCUBTemporaryStorage, this->nvidiaCUBTemporaryStorageBytes));
 
@@ -135,11 +138,11 @@ void Simulation::Step()
         WarpSort(this->particleBlocks, this->particleCount, this->blockCodeToIndex, Program::cellSize, this->particleHomeBlockCodes, this->simulationStream);
         CUDA_CHECK(cudaMemsetAsync(this->gridBlocks, 0, this->activeBlockCount * sizeof(GridBlock), this->simulationStream));
         P2GKernel<<<launchBlocks, this->threadsPerBlock, bSplineSharedMemoryBytes, this->simulationStream>>>(this->particleBlocks, this->gridBlocks, this->particleCount, this->blockCodeToIndex, Program::cellSize, Program::physicsTimeStep, Program::secondLameParameter, Program::firstLameParameter, Program::hardeningCoefficient, true, this->particleHomeBlockCodes);
-        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
         UpdateGridKernel<<<gridLaunchBlocks, this->threadsPerBlock, 0, this->simulationStream>>>(this->gridBlocks, this->blockCodes, Program::maxBlocks, Program::physicsTimeStep, Program::gravity, Program::cellCountPerAxis, Program::boundaryFriction, Program::cellSize, this->sdfDistances, this->sdfNormals, this->boxCenter, this->boxHalfExtents, this->boxVelocity);
-        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
         G2PKernel<<<launchBlocks, this->threadsPerBlock, bSplineSharedMemoryBytes, this->simulationStream>>>(this->particleBlocks, this->gridBlocks, this->particleCount, this->blockCodeToIndex, Program::cellSize, Program::physicsTimeStep, Program::criticalCompression, Program::criticalStretch, this->particleHomeBlockCodes, this->rebuildFlag);
-        CUDA_CHECK(cudaGetLastError());
+        CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
         return;
     }
 
@@ -161,6 +164,7 @@ void Simulation::Step()
     }
 
     CUDA_CHECK(cudaGraphLaunch(this->simulationGraphExec, this->simulationStream));
+    CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
 }
 
 void Simulation::SyncPositionsToVBO()
@@ -179,13 +183,22 @@ void Simulation::SyncPositionsToVBO()
     CUDA_CHECK(cudaGraphicsUnmapResources(1, &this->vboResource));
 }
 
-void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount) const
+void Simulation::Reset(const ParticleBlock* initialBlocks, const int blockCount, const int newParticleCount)
 {
+    if (this->graphValid)
+    {
+        CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
+        CUDA_CHECK(cudaGraphExecDestroy(this->simulationGraphExec));
+        this->graphValid = false;
+    }
+
+    this->particleCount = newParticleCount;
+
     CUDA_CHECK(cudaMemcpy(this->particleBlocks, initialBlocks, blockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(this->blockCodeToIndex.keys, 0xFF, Program::maxBlocks * sizeof(uint64_t)));
     CUDA_CHECK(cudaMemset(this->nextBlockIndex, 0, sizeof(uint32_t)));
     CUDA_CHECK(cudaMemset(this->gridBlocks, 0, Program::maxBlocks * sizeof(GridBlock)));
-    CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, this->particleCount * sizeof(uint64_t)));
+    CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, newParticleCount * sizeof(uint64_t)));
 
     constexpr uint32_t forceRebuild = 1u;
     CUDA_CHECK(cudaMemcpy(this->rebuildFlag, &forceRebuild, sizeof(uint32_t), cudaMemcpyHostToDevice));

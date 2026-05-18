@@ -20,7 +20,7 @@ typedef CUgraphExec_st* cudaGraphExec_t;
 class Simulation
 {
 public:
-    Simulation(int particleCount, const ParticleBlock* initialParticleBlocks, int particleBlockCount, unsigned int vbo);
+    Simulation(int maxParticleCount, int initialParticleCount, const ParticleBlock* initialParticleBlocks, int initialParticleBlockCount, unsigned int vbo);
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
@@ -28,10 +28,11 @@ public:
     void ClearMeshBoundary() const;
     void SetBoxBoundary(glm::vec3 center, glm::vec3 halfExtents, glm::vec3 velocity) const;
     void ClearBoxBoundary() const;
-    void Reset(const ParticleBlock* initialBlocks, int blockCount) const;
+    void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
 
 private:
     int particleCount;
+    int allocatedParticleCount;
 
     ParticleBlock* particleBlocks{};
     ParticleBlock* particleBlocksSortingBuffer{};

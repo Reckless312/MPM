@@ -1,3 +1,4 @@
+#include <cmath>
 #include <iostream>
 #include <ostream>
 
@@ -36,7 +37,14 @@ void Program::InitializeGLFW()
 
 void Program::CreateWindowAndAssignContext()
 {
-    this->window = glfwCreateWindow(Program::windowWidth, Program::windowHeight, Program::windowTitle, Program::fullscreenMonitor, Program::windowToShareResources);
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* videoMode = glfwGetVideoMode(primaryMonitor);
+
+    Program::currentWidth = videoMode->width;
+    Program::currentHeight = videoMode->height;
+
+    GLFWmonitor* monitor = Program::recordingMode ? nullptr : primaryMonitor;
+    this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, monitor, Program::windowToShareResources);
 
     if (this->window == nullptr)
     {
@@ -56,7 +64,7 @@ void Program::LoadGladLibrary()
 
 void Program::SetViewportAndResizeCallback() const
 {
-    glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, Program::windowWidth, Program::windowHeight);
+    glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, Program::currentWidth, Program::currentHeight);
 
     glfwSetFramebufferSizeCallback(this->window, Program::ResizeWindow);
 }
@@ -145,6 +153,11 @@ void Program::UpdateFPSOnWindowTitle() const
         const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
         glfwSetWindowTitle(this->window, title.c_str());
     }
+}
+
+int Program::RecordingSubstepsPerFrame()
+{
+    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * physicsTimeStep)));
 }
 
 void Program::ApplySceneParameters(const SceneParameters& sceneParameters)

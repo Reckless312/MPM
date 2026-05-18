@@ -30,8 +30,13 @@ public:
     inline static int maxBlocks = 16384;
     inline static int cellCountPerAxis = 256;
     inline static float cellSize = 0.02f;
-    inline static float physicsTimeStep = 2e-4f;
+    inline static float physicsTimeStep = 1e-4f;
+    // inline static float physicsTimeStep = 2e-4f;
     inline static float gravity = 9.8f;
+    inline static bool recordingMode = true;
+    inline static int recordingFrameRate = 144;
+    inline static int recordingDurationSeconds = 30;
+    inline static const char* recordingOutputPath = "/home/cora/Videos/simulation.mp4";
     inline static float firstLameParameter = 1.333e4f;
     inline static float secondLameParameter = 2.0e4f;
     inline static float hardeningCoefficient = 10.0f;
@@ -58,6 +63,7 @@ public:
     [[nodiscard]] bool IsPaused() const;
 
     static void ApplySceneParameters(const SceneParameters& sceneParameters);
+    static int RecordingSubstepsPerFrame();
     static void InitializeGLFW();
     static void LoadGladLibrary();
     static void ResizeWindow(GLFWwindow* window, int width, int height);

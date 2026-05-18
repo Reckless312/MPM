@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <optional>
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -12,6 +14,7 @@
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/Box.h"
 #include "OpenGL/Render/Particle.h"
+#include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/Snowfall.h"
@@ -24,6 +27,10 @@ int main()
     try
     {
         Program::InitializeGLFW();
+        if (Program::recordingMode)
+        {
+            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        }
         program.CreateWindowAndAssignContext();
         Program::LoadGladLibrary();
     }
@@ -119,14 +126,18 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    const glm::vec3 boxHalfExtents(0.2f, 0.2f, 0.2f);
+    constexpr glm::vec3 boxHalfExtents(0.2f, 0.2f, 0.2f);
     float boxCenterZ = 0.7f;
 
     Box box(boxHalfExtents);
 
-    Particle snowfallParticles(snowfall.initialPositions);
+    const int maxParticleCount = std::max(snowfall.particleCount, snowLayer.particleCount);
 
-    Simulation simulation(snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfallParticles.GetVBO());
+    std::vector<glm::vec3> maxPositions(maxParticleCount, glm::vec3(0.0f));
+    std::copy(snowfall.initialPositions.begin(), snowfall.initialPositions.end(), maxPositions.begin());
+    Particle snowfallParticles(maxPositions);
+
+    Simulation simulation(maxParticleCount, snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfallParticles.GetVBO());
 
     constexpr glm::mat4 logoTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(1.3f, 1.2f, 2.56f));
     // Blender Moment
@@ -144,6 +155,13 @@ int main()
     glEnable(GL_PROGRAM_POINT_SIZE);
 
     int activeScene = 1;
+    const int substepsPerFrame = Program::recordingMode ? Program::RecordingSubstepsPerFrame() : 5;
+
+    std::optional<VideoRecorder> recorder;
+    if (Program::recordingMode)
+    {
+        recorder.emplace(Program::currentWidth, Program::currentHeight);
+    }
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -155,7 +173,7 @@ int main()
             Program::ApplySceneParameters(snowfallSceneParameters);
             simulation.ClearBoxBoundary();
             simulation.UploadMeshBoundary(solidCells);
-            simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()));
+            simulation.Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfall.particleCount);
         }
 
         if (program.WasSecondSceneSelected())
@@ -163,7 +181,7 @@ int main()
             activeScene = 2;
             Program::ApplySceneParameters(snowGroundSceneParameters);
             simulation.ClearMeshBoundary();
-            simulation.Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()));
+            simulation.Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()), snowLayer.particleCount);
             boxCenterZ = 0.7f;
         }
 
@@ -182,13 +200,13 @@ int main()
 
         if (!program.IsPaused())
         {
-            constexpr float boxSpeed = 3.0f;
-            constexpr float boxMaxZ = 3.8f;
-
-            for (int step = 0; step < 6; step++)
+            for (int step = 0; step < substepsPerFrame; step++)
             {
                 if (activeScene == 2)
                 {
+                    constexpr float boxMaxZ = 3.8f;
+                    constexpr float boxSpeed = 3.0f;
+
                     if (boxCenterZ < boxMaxZ)
                     {
                         boxCenterZ += boxSpeed * Program::physicsTimeStep;
@@ -203,6 +221,11 @@ int main()
             }
 
             simulation.SyncPositionsToVBO();
+        }
+
+        if (recorder)
+        {
+            recorder->BeginFrame();
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -247,7 +270,19 @@ int main()
 
         snowfallParticles.Draw(particleShader);
 
-        glfwSwapBuffers(program.window);
+        if (recorder)
+        {
+            recorder->EndFrame();
+            if (recorder->IsDone())
+            {
+                break;
+            }
+        }
+        else
+        {
+            glfwSwapBuffers(program.window);
+        }
+
         glfwPollEvents();
     }
 
