@@ -133,8 +133,8 @@ int main()
 
     const int maxParticleCount = std::max(snowfall.particleCount, snowLayer.particleCount);
 
-    std::vector<glm::vec3> maxPositions(maxParticleCount, glm::vec3(0.0f));
-    std::copy(snowfall.initialPositions.begin(), snowfall.initialPositions.end(), maxPositions.begin());
+    std::vector maxPositions(maxParticleCount, glm::vec3(0.0f));
+    std::ranges::copy(snowfall.initialPositions, maxPositions.begin());
     Particle snowfallParticles(maxPositions);
 
     Simulation simulation(maxParticleCount, snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfallParticles.GetVBO());
@@ -157,10 +157,12 @@ int main()
     int activeScene = 1;
     const int substepsPerFrame = Program::recordingMode ? Program::RecordingSubstepsPerFrame() : 5;
 
+    int recordingScene = 1;
     std::optional<VideoRecorder> recorder;
+
     if (Program::recordingMode)
     {
-        recorder.emplace(Program::currentWidth, Program::currentHeight);
+        recorder.emplace(Program::currentWidth, Program::currentHeight, Program::recordingOutputPathScene1);
     }
 
     while (!glfwWindowShouldClose(program.window))
@@ -270,20 +272,38 @@ int main()
 
         snowfallParticles.Draw(particleShader);
 
-        if (recorder)
+        if (!recorder)
         {
-            recorder->EndFrame();
-            if (recorder->IsDone())
-            {
-                break;
-            }
+            glfwSwapBuffers(program.window);
+            glfwPollEvents();
+            continue;
+        }
+
+        recorder->EndFrame();
+
+        if (!recorder->IsDone())
+        {
+            glfwPollEvents();
+            continue;
+        }
+
+        if (recordingScene == 1)
+        {
+            recordingScene = 2;
+            activeScene = 2;
+
+            Program::ApplySceneParameters(snowGroundSceneParameters);
+
+            simulation.ClearMeshBoundary();
+            simulation.Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()), snowLayer.particleCount);
+
+            boxCenterZ = 0.7f;
+            recorder.emplace(Program::currentWidth, Program::currentHeight, Program::recordingOutputPathScene2);
         }
         else
         {
-            glfwSwapBuffers(program.window);
+            break;
         }
-
-        glfwPollEvents();
     }
 
     return 0;
