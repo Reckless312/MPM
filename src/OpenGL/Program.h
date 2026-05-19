@@ -44,6 +44,10 @@ public:
     inline static float criticalCompression = 0.025f;
     inline static float criticalStretch = 0.0075f;
     inline static float boundaryFriction = 0.8f;
+
+    /* Particle Rendering */
+    inline static constexpr float particleShellRadius = 0.018f;
+    inline static constexpr float shellInnerFraction = 0.85f;
     /* ---- */
 
     explicit Program();

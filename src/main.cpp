@@ -13,6 +13,7 @@
 #include "OpenGL/Program.h"
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/Box.h"
+#include "OpenGL/Render/IceCrystalTexture.h"
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
@@ -47,11 +48,13 @@ int main()
 
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
     Shader particleShader("particleVertex.vs", "particleFragment.fs");
+    Shader shellShader("shellVertex.vs", "shellFragment.fs");
 
     try
     {
         sceneShader.Load();
         particleShader.Load();
+        shellShader.Load();
     }
     catch (const MPMException& exception)
     {
@@ -153,6 +156,8 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
+
+    IceCrystalTexture iceCrystalTexture;
 
     int activeScene = 1;
     const int substepsPerFrame = Program::recordingMode ? Program::RecordingSubstepsPerFrame() : 5;
@@ -258,19 +263,27 @@ int main()
             box.Draw(sceneShader);
         }
 
-        particleShader.Use();
+        shellShader.Use();
 
-        glm::mat4 viewMatrix = camera.GetViewMatrix();
-        glm::mat4 projMatrix = camera.GetProjectionMatrix();
-        glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
+        const glm::mat4 viewMatrix = camera.GetViewMatrix();
+        const glm::mat4 projMatrix = camera.GetProjectionMatrix();
+        const glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
 
-        particleShader.SetMat4("view", viewMatrix);
-        particleShader.SetMat4("projection", projMatrix);
-        particleShader.SetFloat("sphereRadius", 0.012f);
-        particleShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
-        particleShader.SetVec3("lightDirEye", lightDirEye);
+        shellShader.SetMat4("view", viewMatrix);
+        shellShader.SetMat4("projection", projMatrix);
+        shellShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
+        shellShader.SetVec3("lightDirEye", lightDirEye);
 
-        snowfallParticles.Draw(particleShader);
+        iceCrystalTexture.Bind(shellShader);
+
+        for (int shell = IceCrystalTexture::shellCount - 1; shell >= 0; shell--)
+        {
+            const float t = static_cast<float>(shell) / static_cast<float>(IceCrystalTexture::shellCount - 1);
+            const float shellFraction = Program::shellInnerFraction + (1.0f - Program::shellInnerFraction) * t;
+            shellShader.SetFloat("sphereRadius", Program::particleShellRadius * shellFraction);
+            shellShader.SetInt("currentShell", shell);
+            snowfallParticles.Draw(shellShader);
+        }
 
         if (!recorder)
         {
