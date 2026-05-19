@@ -21,6 +21,9 @@ void main()
     gl_FragDepth = clipSpacePos.z / clipSpacePos.w * 0.5 + 0.5;
 
     float diffuse = max(0.0, dot(N, lightDirEye));
-    vec3 snowColor = vec3(0.9, 0.95, 1.0);
-    FragmentColor = vec4(snowColor * (0.5 + 0.5 * diffuse), 1.0);
+    float fresnel = pow(1.0 - abs(N.z), 3.0);
+    float light = 0.5 + 0.5 * diffuse + 0.4 * fresnel;
+    vec3 shadowColor = vec3(0.55, 0.7, 0.9);
+    vec3 litColor = vec3(1.0, 1.0, 1.0);
+    FragmentColor = vec4(mix(shadowColor, litColor, light), 1.0);
 }
