@@ -58,6 +58,7 @@ glm::vec3 Camera::GetPosition() const
     return this->position;
 }
 
+
 glm::mat4 Camera::GetViewMatrix() const
 {
     return this->viewMatrix;

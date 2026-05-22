@@ -31,11 +31,11 @@ public:
     inline static int cellCountPerAxis = 256;
     inline static float cellSize = 0.02f;
     inline static float physicsTimeStep = 3e-4f;
-    // inline static float physicsTimeStep = 1e-4f;
+    //inline static float physicsTimeStep = 1e-4f;
     inline static float gravity = 9.8f;
     inline static bool recordingMode = false;
     inline static int recordingFrameRate = 144;
-    inline static int recordingDurationSeconds = 7;
+    inline static int recordingDurationSeconds = 5;
     inline static const char* recordingOutputPathScene1 = "/home/cora/Videos/scene1.mp4";
     inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/scene2.mp4";
     inline static float firstLameParameter = 1.333e4f;

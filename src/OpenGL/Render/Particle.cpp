@@ -15,6 +15,14 @@ void Particle::Update(const std::vector<glm::vec3> &positions)
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(positions.size() * sizeof(glm::vec3)), positions.data(), GL_DYNAMIC_DRAW);
 }
 
+void Particle::ResizeVBO(const int newCount)
+{
+    this->count = newCount;
+    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+    glBufferData(GL_ARRAY_BUFFER, newCount * static_cast<GLsizeiptr>(sizeof(glm::vec3)), nullptr, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 void Particle::Draw(const Shader &shader) const
 {
     glBindVertexArray(VAO);

@@ -26,9 +26,12 @@ public:
     void SyncPositionsToVBO();
     void UploadMeshBoundary(const MeshSDF& sdf) const;
     void ClearMeshBoundary() const;
-    void SetBoxBoundary(glm::vec3 center, glm::vec3 halfExtents, glm::vec3 velocity) const;
-    void ClearBoxBoundary() const;
+    void SetBoundaryVelocity(glm::vec3 velocity) const;
+    void ShiftSdfZ(int cells);
     void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
+    void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
+    int Grow();
+    void RebindVBO();
 
 private:
     int particleCount;
@@ -55,16 +58,17 @@ private:
     size_t nvidiaCUBTemporaryStorageBytes = 0;
 
     cudaGraphicsResource* vboResource{};
+    unsigned int vboId{};
     float* sdfDistances{};
     glm::vec3* sdfNormals{};
-
-    glm::vec3* boxCenter{};
-    glm::vec3* boxHalfExtents{};
-    glm::vec3* boxVelocity{};
+    glm::vec3* boundaryVelocity{};
 
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};
     bool graphValid = false;
+
+    void AllocateParticleBuffers(int count);
+    void FreeParticleBuffers() const;
 
     const int threadsPerBlock = 128;
 

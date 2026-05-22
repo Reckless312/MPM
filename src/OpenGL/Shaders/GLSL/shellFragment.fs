@@ -1,6 +1,5 @@
 #version 330 core
 
-flat in float randomAngle;
 in vec3 eyeSpacePos;
 
 uniform mat4 projection;
@@ -19,7 +18,7 @@ const float ambientStrength = 0.4;
 const float glitterShininess = 16.0;
 const float glitterStrength = 0.2;
 
-const vec3 shadowColor = vec3(0.55, 0.7, 0.9);
+const vec3 shadowColor = vec3(0.45, 0.60, 0.80);
 const vec3 litColor = vec3(1.0, 1.0, 1.0);
 
 void main()
@@ -34,7 +33,7 @@ void main()
     vec4 clipSpacePos = projection * pixelPos;
     gl_FragDepth = clipSpacePos.z / clipSpacePos.w * 0.5 + 0.5;
 
-    float u = fract((atan(N.y, N.x) + randomAngle) / (2.0 * pi));
+    float u = fract(atan(N.y, N.x) / (2.0 * pi));
     float v = acos(-N.z) / pi;
     vec3 texCoord = vec3(u, v, float(currentShell));
 

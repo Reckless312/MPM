@@ -11,6 +11,7 @@ public:
     explicit Particle(const std::vector<glm::vec3> &positions);
 
     void Update(const std::vector<glm::vec3> &positions);
+    void ResizeVBO(int newCount);
     void Draw(const Shader &shader) const override;
 
 private:
