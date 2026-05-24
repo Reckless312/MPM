@@ -49,8 +49,6 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Render/RenderObject.cpp
         src/OpenGL/Render/VideoRecorder.h
         src/OpenGL/Render/VideoRecorder.cpp
-        src/OpenGL/Render/IceCrystalTexture.h
-        src/OpenGL/Render/IceCrystalTexture.cpp
         src/OpenGL/SimulationConfig.h
         src/OpenGL/Simulation/SnowVolume.cpp
 )

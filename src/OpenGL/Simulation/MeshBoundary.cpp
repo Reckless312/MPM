@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <execution>
 #include <limits>
-#include <numeric>
+#include <mutex>
 
 #include <glm/glm.hpp>
 
@@ -74,58 +74,62 @@ glm::vec3 MeshBoundary::ClosestPointOnTriangle(glm::vec3 point, glm::vec3 v0, gl
 
 MeshSDF MeshBoundary::Voxelize(const std::vector<std::array<glm::vec3, 3>>& triangles, const int cellCountPerAxis, const float cellSize)
 {
-    const int cellsPerLayer = cellCountPerAxis * cellCountPerAxis;
-    const int nodeCount = cellsPerLayer * cellCountPerAxis;
+    const int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
     const float narrowBand = 4.0f * cellSize;
 
     MeshSDF sdf;
     sdf.distances.assign(nodeCount, std::numeric_limits<float>::max());
     sdf.normals.assign(nodeCount, glm::vec3(0.0f));
 
-    std::vector<int> nodeIndices(nodeCount);
-    std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
+    constexpr int stripeCount = 4096;
+    std::array<std::mutex, stripeCount> nodeMutexes;
 
-    std::for_each(std::execution::par_unseq, nodeIndices.begin(), nodeIndices.end(), [&](const int index)
+    std::for_each(std::execution::par, triangles.begin(), triangles.end(), [&](const auto& triangle)
     {
-        const int z = index / cellsPerLayer;
-        const int y = (index / cellCountPerAxis) % cellCountPerAxis;
-        const int x = index % cellCountPerAxis;
+        const glm::vec3& v0 = triangle[0];
+        const glm::vec3& v1 = triangle[1];
+        const glm::vec3& v2 = triangle[2];
 
-        const glm::vec3 nodePosition(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, static_cast<float>(z) * cellSize);
+        const glm::vec3 triangleNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
-        float bestAbsDist = std::numeric_limits<float>::max();
+        const glm::vec3 boundsMin = glm::min(glm::min(v0, v1), v2);
+        const glm::vec3 boundsMax = glm::max(glm::max(v0, v1), v2);
 
-        for (const auto& triangle : triangles)
+        const int cellXMin = std::max(0, static_cast<int>(std::floor((boundsMin.x - narrowBand) / cellSize)));
+        const int cellYMin = std::max(0, static_cast<int>(std::floor((boundsMin.y - narrowBand) / cellSize)));
+        const int cellZMin = std::max(0, static_cast<int>(std::floor((boundsMin.z - narrowBand) / cellSize)));
+
+        const int cellXMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.x + narrowBand) / cellSize)));
+        const int cellYMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.y + narrowBand) / cellSize)));
+        const int cellZMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.z + narrowBand) / cellSize)));
+
+        for (int z = cellZMin; z <= cellZMax; z++)
         {
-            const glm::vec3& v0 = triangle[0];
-            const glm::vec3& v1 = triangle[1];
-            const glm::vec3& v2 = triangle[2];
-
-            const glm::vec3 boundsMin = glm::min(glm::min(v0, v1), v2) - narrowBand;
-            // ReSharper disable once CppTooWideScopeInitStatement
-            const glm::vec3 boundsMax = glm::max(glm::max(v0, v1), v2) + narrowBand;
-
-            if (glm::any(glm::lessThan(nodePosition, boundsMin) || glm::greaterThan(nodePosition, boundsMax)))
+            for (int y = cellYMin; y <= cellYMax; y++)
             {
-                continue;
+                for (int x = cellXMin; x <= cellXMax; x++)
+                {
+                    const glm::vec3 nodePosition(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, static_cast<float>(z) * cellSize);
+                    const glm::vec3 closestPoint = ClosestPointOnTriangle(nodePosition, v0, v1, v2);
+                    const glm::vec3 toNode = nodePosition - closestPoint;
+                    const float distance = glm::length(toNode);
+
+                    if (distance >= narrowBand)
+                    {
+                        continue;
+                    }
+
+                    const int index = z * cellCountPerAxis * cellCountPerAxis + y * cellCountPerAxis + x;
+
+                    std::lock_guard<std::mutex> lock(nodeMutexes[index % stripeCount]);
+                    if (distance < std::abs(sdf.distances[index]))
+                    {
+                        const float sign = glm::dot(toNode, triangleNormal) >= 0.0f ? 1.0f : -1.0f;
+                        sdf.distances[index] = sign * distance;
+                        sdf.normals[index] = triangleNormal;
+                    }
+                }
             }
-
-            const glm::vec3 closestPoint = ClosestPointOnTriangle(nodePosition, v0, v1, v2);
-            const glm::vec3 toNode = nodePosition - closestPoint;
-
-            const float distance = glm::length(toNode);
-
-            if (distance >= narrowBand || distance >= bestAbsDist)
-            {
-                continue;
-            }
-
-            bestAbsDist = distance;
-            const glm::vec3 triangleNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-            const float sign = glm::dot(toNode, triangleNormal) >= 0.0f ? 1.0f : -1.0f;
-
-            sdf.distances[index] = sign * distance;
-            sdf.normals[index] = triangleNormal;
         }
     });
 

@@ -4,11 +4,18 @@
 #include <map>
 
 #include "Program.h"
+
+#include "SimulationConfig.h"
 #include "OpenGL/Scene/Camera.h"
 
 Program::Program()
 {
     this->window = nullptr;
+
+    if (Program::recordingMode)
+    {
+        Program::simulationSteps = static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * SimulationConfig::physicsTimeStep)));
+    }
 }
 
 Program::~Program()

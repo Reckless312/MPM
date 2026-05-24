@@ -1,14 +1,16 @@
 #ifndef MPM_METHOD_SIMULATIONCONFIG_H
 #define MPM_METHOD_SIMULATIONCONFIG_H
 
+#include <iostream>
+
 namespace SimulationConfig
 {
     inline constexpr int maxBlocks = 16384;
     inline constexpr int cellCountPerAxis = 256;
     inline constexpr float cellSize = 0.02f;
 
-    // inline static float physicsTimeStep = 3e-4f;
-    // inline static float physicsTimeStep = 1e-4f;
+    inline static float physicsTimeStep = 3e-4f;
+    //inline static float physicsTimeStep = 1e-4f;
 
     inline float firstLameParameter = 3.889e4f;
     inline float secondLameParameter = 5.833e4f;

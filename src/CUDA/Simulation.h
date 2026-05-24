@@ -33,8 +33,6 @@ public:
     void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
     void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
 
-    static int RecordingSubstepsPerFrame();
-
     int Grow();
     void RebindVBO();
 

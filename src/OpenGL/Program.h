@@ -19,6 +19,9 @@ public:
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
 
+    inline static int activeScene = 1;
+    inline static int simulationSteps = 5;
+
     /* Recording Settings */
     inline static bool recordingMode = false;
     inline static int recordingFrameRate = 144;
@@ -28,7 +31,6 @@ public:
 
     /* Particle Rendering */
     inline static float particleShellRadius = 0.018f;
-    inline static float shellInnerFraction = 0.85f;
     /* ---- */
 
     explicit Program();
