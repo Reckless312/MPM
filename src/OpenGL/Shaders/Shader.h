@@ -12,9 +12,8 @@ public:
     Shader(const char* vertexShaderPath, const char* fragmentShaderPath);
     ~Shader();
 
-    void Load() const;
     void Use() const;
-
+    void Load() const;
     void SetInt(const std::string& name, int value) const;
     void SetBool(const std::string& name, bool value) const;
     void SetFloat(const std::string& name, float value) const;
@@ -25,10 +24,10 @@ public:
 private:
     unsigned int id;
 
+    const int errorMessageSize = 512;
+
     std::string vertexShaderPath;
     std::string fragmentShaderPath;
-
-    const int errorMessageSize = 512;
 
     static std::string ReadShader(const std::string& path);
 

@@ -3,14 +3,14 @@
 #include "Camera.h"
 #include "Exceptions/MPMException.h"
 
-Camera::Camera(GLFWwindow* window)
+Camera::Camera(GLFWwindow* window, int width, int height)
 {
     this->window = window;
 
-    int framebufferWidth, framebufferHeight;
-    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
-    this->mouseXDirection = static_cast<float>(framebufferWidth) / 2.0f;
-    this->mouseYDirection = static_cast<float>(framebufferHeight) / 2.0f;
+    this->UpdateWindowSize(width, height);
+
+    this->mouseXDirection = static_cast<float>(this->width) / 2.0f;
+    this->mouseYDirection = static_cast<float>(this->height) / 2.0f;
 
     this->position = glm::vec3(0.0f, 0.0f, 3.0f);
     this->front = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -33,15 +33,20 @@ void Camera::UpdateViewMatrix()
 
 void Camera::UpdateProjectionMatrix()
 {
-    int framebufferWidth, framebufferHeight;
-    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
-    float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+    const float aspectRatio = static_cast<float>(this->width) / static_cast<float>(this->height);
+
     this->projectionMatrix = glm::perspective(glm::radians(this->fov), aspectRatio, this->nearPlane, this->farPlane);
 }
 
 void Camera::UpdateSpeed(const float deltaTime)
 {
     this->speed = this->speedMultiplier * deltaTime;
+}
+
+void Camera::UpdateWindowSize(const int newWidth, const int newHeight)
+{
+    this->width = newWidth;
+    this->height = newHeight;
 }
 
 void Camera::SetInitialOrientation(const glm::vec3 desiredPosition, const float desiredYaw, const float desiredPitch)
@@ -125,7 +130,6 @@ void Camera::UpdateMousePosition(const float currentXDirection, const float curr
 
     this->yaw += xDirectionOffset;
 
-    // Invert up and down
     this->UpdatePitch(-yDirectionOffset);
     this->UpdateDirection();
 }

@@ -10,6 +10,7 @@
 #include "Structures/GridBuffer.h"
 #include "Structures/HashTable.h"
 #include "OpenGL/Simulation/MeshBoundary.h"
+#include "OpenGL/Simulation/SnowVolume.h"
 
 struct cudaGraphicsResource;
 struct CUstream_st;
@@ -20,8 +21,9 @@ typedef CUgraphExec_st* cudaGraphExec_t;
 class Simulation
 {
 public:
-    Simulation(int maxParticleCount, int initialParticleCount, const ParticleBlock* initialParticleBlocks, int initialParticleBlockCount, unsigned int vbo);
+    Simulation(const SnowVolume& volume, unsigned int vbo);
     ~Simulation();
+
     void Step();
     void SyncPositionsToVBO();
     void UploadMeshBoundary(const MeshSDF& sdf) const;
@@ -30,6 +32,9 @@ public:
     void ShiftSdfZ(int cells);
     void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
     void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
+
+    static int RecordingSubstepsPerFrame();
+
     int Grow();
     void RebindVBO();
 

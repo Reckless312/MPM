@@ -51,7 +51,6 @@ void Shader::Load() const
 std::string Shader::ReadShader(const std::string& path)
 {
     std::string shaderCode;
-
     std::ifstream shaderFile;
 
     shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
@@ -67,9 +66,9 @@ std::string Shader::ReadShader(const std::string& path)
 
         shaderCode = shaderStream.str();
     }
-    catch (std::ifstream::failure& e)
+    catch (std::ifstream::failure& error)
     {
-        throw MPMException(e.what(), Error::ShaderFileRead);
+        throw MPMException(error.what(), Error::ShaderFileRead);
     }
 
     return shaderCode;

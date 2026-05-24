@@ -1,19 +1,10 @@
 #ifndef MPM_METHOD_PROGRAM_H
 #define MPM_METHOD_PROGRAM_H
 
+#include <map>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
 #include "Exceptions/MPMException.h"
-
-struct SceneParameters
-{
-    float firstLameParameter;
-    float secondLameParameter;
-    float hardeningCoefficient;
-    float criticalCompression;
-    float criticalStretch;
-};
 
 class Program
 {
@@ -23,52 +14,35 @@ public:
     /* Time between frames */
     float deltaTime = 0.0f;
 
-    /* Simulation Settings */
+    bool paused = false;
+
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
 
-    inline static int maxBlocks = 16384;
-    inline static int cellCountPerAxis = 256;
-    inline static float cellSize = 0.02f;
-    inline static float physicsTimeStep = 3e-4f;
-    //inline static float physicsTimeStep = 1e-4f;
-    inline static float gravity = 9.8f;
+    /* Recording Settings */
     inline static bool recordingMode = false;
     inline static int recordingFrameRate = 144;
     inline static int recordingDurationSeconds = 5;
-    inline static const char* recordingOutputPathScene1 = "/home/cora/Videos/scene1.mp4";
-    inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/scene2.mp4";
-    inline static float firstLameParameter = 1.333e4f;
-    inline static float secondLameParameter = 2.0e4f;
-    inline static float hardeningCoefficient = 10.0f;
-    inline static float criticalCompression = 0.025f;
-    inline static float criticalStretch = 0.0075f;
-    inline static float boundaryFriction = 0.8f;
+    inline static const char* firstRecordingOutputPathScene = "/home/cora/Videos/ubb_logo.mp4";
+    inline static const char* secondRecordingOutputPathScene = "/home/cora/Videos/sled.mp4";
 
     /* Particle Rendering */
-    inline static constexpr float particleShellRadius = 0.018f;
-    inline static constexpr float shellInnerFraction = 0.85f;
+    inline static float particleShellRadius = 0.018f;
+    inline static float shellInnerFraction = 0.85f;
     /* ---- */
 
     explicit Program();
     ~Program();
 
     void SwitchPause();
-    void ProcessInput();
-    void UpdateKeyStates();
     void UpdateDeltaTime();
     void LockCursor() const;
-    void UpdateFPSOnWindowTitle() const;
+    void ProcessInput() const;
     void CreateWindowAndAssignContext();
     void SetViewportAndResizeCallback() const;
 
-    [[nodiscard]] bool WasFirstSceneSelected() const;
-    [[nodiscard]] bool WasSecondSceneSelected() const;
-    [[nodiscard]] bool WasPauseKeyPressed() const;
-    [[nodiscard]] bool IsPaused() const;
+    [[nodiscard]] bool IsKeyJustPressed(int key);
 
-    static void ApplySceneParameters(const SceneParameters& sceneParameters);
-    static int RecordingSubstepsPerFrame();
     static void InitializeGLFW();
     static void LoadGladLibrary();
     static void ResizeWindow(GLFWwindow* window, int width, int height);
@@ -81,27 +55,17 @@ private:
     static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
     static constexpr int glfwPlatform = GLFW_PLATFORM_X11;
 
-    static constexpr GLFWmonitor* fullscreenMonitor = nullptr;
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 
     static constexpr GLint viewportBottomLeftX = 0;
     static constexpr GLint viewportBottomLeftY = 0;
 
-    static constexpr GLsizei windowWidth = 800;
-    static constexpr GLsizei windowHeight = 600;
-
     inline static const char* windowTitle = "MPM Snow Simulation";
     /* ---- */
 
-    float lastFrame = 0.0f;
+    std::map<int, bool> previousKeyStates;
 
-    bool firstSceneKeyPressed = false;
-    bool firstSceneKeyWasDown = false;
-    bool secondSceneKeyPressed = false;
-    bool secondSceneKeyWasDown = false;
-    bool pauseKeyPressed = false;
-    bool pauseKeyWasDown = false;
-    bool paused = false;
+    float lastFrame = 0.0f;
 };
 
 

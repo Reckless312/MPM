@@ -46,17 +46,13 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/OpenGL/Simulation/MeshBoundary.h
         src/OpenGL/Simulation/MeshBoundary.cpp
         src/CUDA/CudaCheck.h
-        src/OpenGL/Simulation/Snowfall.cpp
-        src/OpenGL/Simulation/Snowfall.h
-        src/OpenGL/Simulation/SnowLayer.cpp
-        src/OpenGL/Simulation/SnowLayer.h
-        src/OpenGL/Render/Box.cpp
-        src/OpenGL/Render/Box.h
         src/OpenGL/Render/RenderObject.cpp
         src/OpenGL/Render/VideoRecorder.h
         src/OpenGL/Render/VideoRecorder.cpp
         src/OpenGL/Render/IceCrystalTexture.h
         src/OpenGL/Render/IceCrystalTexture.cpp
+        src/OpenGL/SimulationConfig.h
+        src/OpenGL/Simulation/SnowVolume.cpp
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})
@@ -73,4 +69,4 @@ target_compile_definitions(MPM_Method PRIVATE
         SHADERS_PATH="${CMAKE_SOURCE_DIR}/src/OpenGL/Shaders/GLSL/"
 )
 
-target_link_libraries(MPM_Method GL GLU glfw X11 Xxf86vm Xrandr pthread Xi dl Xinerama Xcursor assimp)
+target_link_libraries(MPM_Method GL GLU glfw X11 Xxf86vm Xrandr pthread Xi dl Xinerama Xcursor assimp tbb)

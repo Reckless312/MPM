@@ -16,6 +16,7 @@ enum class Error
     PositionMemoryAllocation = 11,
     BlocksMemoryAllocation = 12,
     ModelMemoryAllocation = 13,
+    WrongPlatform = 14,
 };
 
 #endif

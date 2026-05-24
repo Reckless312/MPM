@@ -8,10 +8,11 @@
 class Camera
 {
 public:
-    explicit Camera(GLFWwindow* window);
+    explicit Camera(GLFWwindow* window, int width, int height);
 
     void ProcessInput();
     void UpdateSpeed(float deltaTime);
+    void UpdateWindowSize(int newWidth, int newHeight);
     void AssignUserPointerAndSetCallbacks();
     void SetInitialOrientation(glm::vec3 desiredPosition, float desiredYaw, float desiredPitch);
     void UpdateProjectionMatrix();
@@ -34,6 +35,9 @@ private:
 
     glm::mat4 viewMatrix{};
     glm::mat4 projectionMatrix{};
+
+    int width{};
+    int height{};
 
     float mouseXDirection;
     float mouseYDirection;

@@ -9,9 +9,6 @@ public:
     RenderObject() = default;
     virtual ~RenderObject();
 
-    RenderObject(RenderObject&& other) noexcept;
-    RenderObject& operator=(RenderObject&& other) noexcept;
-
     virtual void Draw(const Shader &shader) const = 0;
 
     [[nodiscard]] unsigned int GetVBO() const;

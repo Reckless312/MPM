@@ -14,15 +14,19 @@
 #include <utility>
 #include "OpenGL/Program.h"
 
-Simulation::Simulation(const int maxParticleCount, const int initialParticleCount, const ParticleBlock* initialParticleBlocks, const int initialParticleBlockCount, const unsigned int vbo)
+Simulation::Simulation(const SnowVolume& volume, const unsigned int vbo)
 {
-    this->particleCount = initialParticleCount;
-    this->allocatedParticleCount = maxParticleCount;
+    const int initialParticleCount = volume.particleCount;
+    const ParticleBlock* initialParticleBlocks = volume.initialBlocks.data();
+    const int initialParticleBlockCount = static_cast<int>(volume.initialBlocks.size());
 
-    CUDA_CHECK(cudaMalloc(&this->particleBlocks, (maxParticleCount + 31) / 32 * sizeof(ParticleBlock)));
+    this->particleCount = initialParticleCount;
+    this->allocatedParticleCount = initialParticleCount;
+
+    CUDA_CHECK(cudaMalloc(&this->particleBlocks, (initialParticleCount + 31) / 32 * sizeof(ParticleBlock)));
     CUDA_CHECK(cudaMemcpy(this->particleBlocks, initialParticleBlocks, initialParticleBlockCount * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
 
-    this->AllocateParticleBuffers(maxParticleCount);
+    this->AllocateParticleBuffers(initialParticleCount);
     CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, initialParticleCount * sizeof(uint64_t)));
 
     CUDA_CHECK(cudaMalloc(&this->gridBlocks, Program::maxBlocks * sizeof(GridBlock)));
@@ -186,6 +190,11 @@ void Simulation::AddParticles(const ParticleBlock* blocks, const int blockCount,
 
     constexpr uint32_t forceRebuild = 1u;
     CUDA_CHECK(cudaMemcpy(this->rebuildFlag, &forceRebuild, sizeof(uint32_t), cudaMemcpyHostToDevice));
+}
+
+int Simulation::RecordingSubstepsPerFrame()
+{
+    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * physicsTimeStep)));
 }
 
 void Simulation::UploadMeshBoundary(const MeshSDF& sdf) const

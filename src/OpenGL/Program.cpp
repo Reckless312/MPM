@@ -1,6 +1,7 @@
 #include <cmath>
 #include <iostream>
 #include <ostream>
+#include <map>
 
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
@@ -26,6 +27,11 @@ void Program::InitializeGLFW()
 
     if (const int isInitialized = glfwInit(); isInitialized != GLFW_TRUE)
     {
+        if (const int errorCode = glfwGetError(nullptr); errorCode == GLFW_PLATFORM_UNAVAILABLE)
+        {
+            throw MPMException("Platform specified is not correct! Please update with the right information.", Error::WrongPlatform);
+        }
+
         throw MPMException("Failed to initialize GLFW.", Error::GLFWInitialization);
     }
 
@@ -33,6 +39,11 @@ void Program::InitializeGLFW()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Program::minorVersion);
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, Program::profile);
+
+    if (Program::recordingMode)
+    {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    }
 }
 
 void Program::CreateWindowAndAssignContext()
@@ -43,7 +54,13 @@ void Program::CreateWindowAndAssignContext()
     Program::currentWidth = videoMode->width;
     Program::currentHeight = videoMode->height;
 
-    GLFWmonitor* monitor = Program::recordingMode ? nullptr : primaryMonitor;
+    GLFWmonitor* monitor = primaryMonitor;
+
+    if (Program::recordingMode)
+    {
+        monitor = nullptr;
+    }
+
     this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, monitor, Program::windowToShareResources);
 
     if (this->window == nullptr)
@@ -69,30 +86,19 @@ void Program::SetViewportAndResizeCallback() const
     glfwSetFramebufferSizeCallback(this->window, Program::ResizeWindow);
 }
 
-bool Program::WasFirstSceneSelected() const
+bool Program::IsKeyJustPressed(const int key)
 {
-    return this->firstSceneKeyPressed && !this->firstSceneKeyWasDown;
-}
+    const bool current = glfwGetKey(this->window, key) == GLFW_PRESS;
+    const bool pressed = current && !this->previousKeyStates[key];
+    this->previousKeyStates[key] = current;
 
-bool Program::WasSecondSceneSelected() const
-{
-    return this->secondSceneKeyPressed && !this->secondSceneKeyWasDown;
+    return pressed;
 }
-
-bool Program::WasPauseKeyPressed() const
-{
-    return this->pauseKeyPressed && !this->pauseKeyWasDown;
-}
-
-bool Program::IsPaused() const
-{
-    return this->paused;
-}
-
 
 void Program::ResizeWindow(GLFWwindow *window, const int width, const int height)
 {
     glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, width, height);
+
     Program::currentWidth = width;
     Program::currentHeight = height;
 
@@ -108,23 +114,12 @@ int Program::ReportErrorAndTerminate(const MPMException &exception)
     return static_cast<int>(exception.GetErrorType());
 }
 
-void Program::ProcessInput()
+void Program::ProcessInput() const
 {
     if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(this->window, true);
     }
-
-    this->firstSceneKeyPressed = glfwGetKey(this->window, GLFW_KEY_1) == GLFW_PRESS;
-    this->secondSceneKeyPressed = glfwGetKey(this->window, GLFW_KEY_2) == GLFW_PRESS;
-    this->pauseKeyPressed = glfwGetKey(this->window, GLFW_KEY_SPACE) == GLFW_PRESS;
-}
-
-void Program::UpdateKeyStates()
-{
-    this->firstSceneKeyWasDown = this->firstSceneKeyPressed;
-    this->secondSceneKeyWasDown = this->secondSceneKeyPressed;
-    this->pauseKeyWasDown = this->pauseKeyPressed;
 }
 
 void Program::UpdateDeltaTime()
@@ -143,28 +138,4 @@ void Program::LockCursor() const
     {
         std::cout << "Cursor is not available." << std::endl;
     }
-}
-
-void Program::UpdateFPSOnWindowTitle() const
-{
-    if (this->deltaTime > 0.0f)
-    {
-        const int fps = static_cast<int>(1.0f / this->deltaTime);
-        const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
-        glfwSetWindowTitle(this->window, title.c_str());
-    }
-}
-
-int Program::RecordingSubstepsPerFrame()
-{
-    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * physicsTimeStep)));
-}
-
-void Program::ApplySceneParameters(const SceneParameters& sceneParameters)
-{
-    firstLameParameter = sceneParameters.firstLameParameter;
-    secondLameParameter = sceneParameters.secondLameParameter;
-    hardeningCoefficient = sceneParameters.hardeningCoefficient;
-    criticalCompression = sceneParameters.criticalCompression;
-    criticalStretch = sceneParameters.criticalStretch;
 }
