@@ -12,6 +12,7 @@ public:
 
     void Update(const std::vector<glm::vec3> &positions);
     void ResizeVBO(int newCount);
+    void SetCount(int newCount);
     void Draw(const Shader &shader) const override;
 
 private:

@@ -15,6 +15,11 @@ void Particle::Update(const std::vector<glm::vec3> &positions)
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(positions.size() * sizeof(glm::vec3)), positions.data(), GL_DYNAMIC_DRAW);
 }
 
+void Particle::SetCount(const int newCount)
+{
+    this->count = newCount;
+}
+
 void Particle::ResizeVBO(const int newCount)
 {
     this->count = newCount;

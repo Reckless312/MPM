@@ -39,6 +39,7 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/MPM/UpdateGrid.cu
         src/CUDA/MPM/G2P.h
         src/CUDA/MPM/G2P.cu
+        src/CUDA/SimParameters.h
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
         src/CUDA/WritePositionsKernel.h
@@ -48,8 +49,6 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/SnowVolume.cpp
         src/OpenGL/Simulation/SnowVolume.h
-        src/OpenGL/Render/Box.cpp
-        src/OpenGL/Render/Box.h
         src/OpenGL/Render/RenderObject.cpp
         src/OpenGL/Render/VideoRecorder.h
         src/OpenGL/Render/VideoRecorder.cpp

@@ -9,6 +9,7 @@
 #include "Structures/ParticleBuffer.h"
 #include "Structures/GridBuffer.h"
 #include "Structures/HashTable.h"
+#include "SimParameters.h"
 #include "OpenGL/Simulation/MeshBoundary.h"
 
 struct cudaGraphicsResource;
@@ -20,13 +21,16 @@ typedef CUgraphExec_st* cudaGraphExec_t;
 class Simulation
 {
 public:
-    Simulation(int maxParticleCount, int initialParticleCount, const ParticleBlock* initialParticleBlocks, int initialParticleBlockCount, unsigned int vbo);
+    Simulation(int initialParticleCount, const ParticleBlock* initialParticleBlocks, int initialParticleBlockCount, unsigned int vbo);
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
+    [[nodiscard]] int GetParticleCount() const;
+    [[nodiscard]] int GetAllocatedParticleCount() const;
     void UploadMeshBoundary(const MeshSDF& sdf) const;
     void ClearMeshBoundary() const;
-    void SetBoundaryVelocity(glm::vec3 velocity) const;
+    void SetBoundaryVelocity(glm::vec3 velocity);
+    void UpdatePhysicsParams();
     void ShiftSdfZ(int cells);
     void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
     void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
@@ -61,7 +65,8 @@ private:
     unsigned int vboId{};
     float* sdfDistances{};
     glm::vec3* sdfNormals{};
-    glm::vec3* boundaryVelocity{};
+
+    SimParameters hostSimParams{};
 
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};
@@ -69,6 +74,7 @@ private:
 
     void AllocateParticleBuffers(int count);
     void FreeParticleBuffers() const;
+    void UploadSimParams() const;
 
     const int threadsPerBlock = 128;
 

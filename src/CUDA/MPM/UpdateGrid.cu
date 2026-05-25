@@ -1,12 +1,13 @@
 #include "UpdateGrid.h"
 #include "../Structures/Morton.h"
 #include "../Preparation/RebuildMapping.h"
+#include "../SimParameters.h"
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const int gridSizeInCells, const float boundaryFriction, const float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals, const glm::vec3* boundaryVelocity)
+__global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const float* sdfDistances, const glm::vec3* sdfNormals)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
-    if (nodeIndex >= totalBlocks * nodesPerBlock)
+    if (nodeIndex >= simulationParameters.maxBlocks * nodesPerBlock)
     {
         return;
     }
@@ -37,9 +38,9 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
     float velocityZ = gridBlocks[gridBlockIndex].velocityZ[nodeLane] / nodeMass;
 
     constexpr float gravity = 9.8f;
-    velocityY -= gravity * deltaTime;
+    velocityY -= gravity * simulationParameters.deltaTime;
 
-    const float tangentialScale = 1.0f - boundaryFriction;
+    const float tangentialScale = 1.0f - simulationParameters.boundaryFriction;
 
     if (nodeGridX < 2 && velocityX < 0.0f)
     {
@@ -47,7 +48,7 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
         velocityY *= tangentialScale;
         velocityZ *= tangentialScale;
     }
-    else if (nodeGridX >= gridSizeInCells - 2 && velocityX > 0.0f)
+    else if (nodeGridX >= simulationParameters.gridSizeInCells - 2 && velocityX > 0.0f)
     {
         velocityX = 0.0f;
         velocityY *= tangentialScale;
@@ -67,7 +68,7 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
             velocityY *= tangentialScale;
         }
     }
-    else if (nodeGridY >= gridSizeInCells - 2)
+    else if (nodeGridY >= simulationParameters.gridSizeInCells - 2)
     {
         if (velocityY > 0.0f)
         {
@@ -87,19 +88,19 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
         velocityX *= tangentialScale;
         velocityY *= tangentialScale;
     }
-    else if (nodeGridZ >= gridSizeInCells - 2 && velocityZ > 0.0f)
+    else if (nodeGridZ >= simulationParameters.gridSizeInCells - 2 && velocityZ > 0.0f)
     {
         velocityZ = 0.0f;
         velocityX *= tangentialScale;
         velocityY *= tangentialScale;
     }
 
-    const int sdfIndex = nodeGridZ * gridSizeInCells * gridSizeInCells + nodeGridY * gridSizeInCells + nodeGridX;
+    const int sdfIndex = nodeGridZ * simulationParameters.gridSizeInCells * simulationParameters.gridSizeInCells + nodeGridY * simulationParameters.gridSizeInCells + nodeGridX;
 
-    if (sdfDistances[sdfIndex] < cellSize)
+    if (sdfDistances[sdfIndex] < simulationParameters.cellSize)
     {
         const glm::vec3 normal = sdfNormals[sdfIndex];
-        const float relNormal = (velocityX - boundaryVelocity->x) * normal.x + (velocityY - boundaryVelocity->y) * normal.y + (velocityZ - boundaryVelocity->z) * normal.z;
+        const float relNormal = (velocityX - simulationParameters.boundaryVelocity.x) * normal.x + (velocityY - simulationParameters.boundaryVelocity.y) * normal.y + (velocityZ - simulationParameters.boundaryVelocity.z) * normal.z;
 
         if (relNormal < 0.0f)
         {

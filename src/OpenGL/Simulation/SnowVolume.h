@@ -13,9 +13,9 @@ public:
     std::vector<glm::vec3> initialPositions{};
     std::vector<ParticleBlock> initialBlocks{};
 
-    int particleCount = 50000;
+    int particleCount;
 
-    SnowVolume(glm::vec3 lowerLeftBoxCorner, glm::vec3 upperRightBoxCorner);
+    SnowVolume(glm::vec3 lowerLeftBoxCorner, glm::vec3 upperRightBoxCorner, int particleCount);
 
     void BuildInitialPositions();
     void BuildParticleBlocks();
@@ -27,6 +27,9 @@ private:
     float snowDensity = 400.0f;
     float particleVolume = 0.0f;
     float particleMass = 0.0f;
+public:
+    float GetParticleVolume() const { return particleVolume; }
+    float GetParticleMass() const { return particleMass; }
 };
 
 #endif

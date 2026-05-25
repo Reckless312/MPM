@@ -4,10 +4,11 @@
 #include "P2G.h"
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
+#include "../SimParameters.h"
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
-__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, const float deltaTime, const float criticalCompression, const float criticalStretch, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
+__global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -30,7 +31,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
         deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
     }
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;
@@ -82,9 +83,9 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
                 const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
-                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
-                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
-                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
+                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * simulationParameters.cellSize;
+                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * simulationParameters.cellSize;
+                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * simulationParameters.cellSize;
 
                 const int nodeBlockX = nodeX / blockSize;
                 const int nodeBlockY = nodeY / blockSize;
@@ -149,7 +150,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
             #pragma unroll
             for (int contractionIndex = 0; contractionIndex < 3; contractionIndex++)
             {
-                value += deltaTime * velocityGradient[row * 3 + contractionIndex] * deformationGradient[contractionIndex * 3 + column];
+                value += simulationParameters.deltaTime * velocityGradient[row * 3 + contractionIndex] * deformationGradient[contractionIndex * 3 + column];
             }
 
             newDeformationGradient[row * 3 + column] = value;
@@ -169,7 +170,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     #pragma unroll
     for (int i = 0; i < 3; i++)
     {
-        clampedS[i] = fmaxf(1.0f - criticalCompression, fminf(1.0f + criticalStretch, s[i]));
+        clampedS[i] = fmaxf(1.0f - simulationParameters.criticalCompression, fminf(1.0f + simulationParameters.criticalStretch, s[i]));
     }
 
     float elasticDeformationGradient[9];
@@ -196,9 +197,9 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
 
     const float newPlasticVolume = oldPlasticVolume * detFNew / detFElastic;
 
-    const float newPositionX = positionX + deltaTime * newVelocityX;
-    const float newPositionY = positionY + deltaTime * newVelocityY;
-    const float newPositionZ = positionZ + deltaTime * newVelocityZ;
+    const float newPositionX = positionX + simulationParameters.deltaTime * newVelocityX;
+    const float newPositionY = positionY + simulationParameters.deltaTime * newVelocityY;
+    const float newPositionZ = positionZ + simulationParameters.deltaTime * newVelocityZ;
 
     const float newGridPositionX = newPositionX * inverseCellSize;
     const float newGridPositionY = newPositionY * inverseCellSize;

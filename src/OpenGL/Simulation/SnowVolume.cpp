@@ -6,8 +6,8 @@
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 
-SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner)
-    : lowerLeftBoxCorner(lowerLeftBoxCorner), upperRightBoxCorner(upperRightBoxCorner)
+SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner, const int particleCount)
+    : lowerLeftBoxCorner(lowerLeftBoxCorner), upperRightBoxCorner(upperRightBoxCorner), particleCount(particleCount)
 {
 }
 

@@ -3,6 +3,7 @@
 
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
+#include "../SimParameters.h"
 #include <cuda_runtime.h>
 #include <svd3/svd3_cuda.h>
 
@@ -40,7 +41,7 @@ __device__ void ComputeBSplineWeights(const float fractionalX, const float fract
     weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }
 
-__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -58,7 +59,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
 
     if (shouldRecordHomeBlocks)
     {
-        particleHomeBlockCodes[particleIndex] = ComputeParticleBlockCode(positionX, positionY, positionZ, cellSize);
+        particleHomeBlockCodes[particleIndex] = ComputeParticleBlockCode(positionX, positionY, positionZ, simulationParameters.cellSize);
     }
 
     const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
@@ -114,9 +115,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
         a[componentIndex] = deformationGradient[componentIndex] - r[componentIndex];
     }
 
-    const float hardening = expf(fmaxf(-10.0f, fminf(hardeningCoefficient * (1.0f - plasticVolume), 10.0f)));
-    const float effectiveShearModulus = shearModulus * hardening;
-    const float effectiveFirstLameParameter = firstLameParameter * hardening;
+    const float hardening = expf(fmaxf(-10.0f, fminf(simulationParameters.hardeningCoefficient * (1.0f - plasticVolume), 10.0f)));
+    const float effectiveShearModulus = simulationParameters.secondLameParameter * hardening;
+    const float effectiveFirstLameParameter = simulationParameters.firstLameParameter * hardening;
     const float volumetricStress = effectiveFirstLameParameter * (J - 1.0f) * J;
 
     float kirchhoff[9];
@@ -136,9 +137,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
         }
     }
 
-    const float stressScale = -4.0f / (cellSize * cellSize) * volume * deltaTime;
+    const float stressScale = -4.0f / (simulationParameters.cellSize * simulationParameters.cellSize) * volume * simulationParameters.deltaTime;
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;
@@ -187,9 +188,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
 
                 const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
-                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
-                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
-                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
+                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * simulationParameters.cellSize;
+                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * simulationParameters.cellSize;
+                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * simulationParameters.cellSize;
 
                 const float stressForceX = kirchhoff[0] * particleToNodeOffsetX + kirchhoff[1] * particleToNodeOffsetY + kirchhoff[2] * particleToNodeOffsetZ;
                 const float stressForceY = kirchhoff[3] * particleToNodeOffsetX + kirchhoff[4] * particleToNodeOffsetY + kirchhoff[5] * particleToNodeOffsetZ;

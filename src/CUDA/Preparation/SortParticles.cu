@@ -1,11 +1,12 @@
 #include "SortParticles.h"
 #include "RebuildMapping.h"
 #include "../Structures/Morton.h"
+#include "../SimParameters.h"
 #include "../CudaCheck.h"
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
-__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys, const float cellSize)
+__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -21,7 +22,7 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;
@@ -101,14 +102,14 @@ __global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
     indices[particleIndex] = static_cast<uint32_t>(particleIndex);
 }
 
-__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable &blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes)
+__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes)
 {
     const int particleBlockIndex = static_cast<int>(blockIdx.x);
     const int lane = static_cast<int>(threadIdx.x);
 
     const int particleIndex = particleBlockIndex * 32 + lane;
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     uint32_t key;
 
@@ -234,13 +235,13 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 
-void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes, const cudaStream_t stream)
+void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes, const cudaStream_t stream)
 {
     const int particleBlockCount = (particleCount + 31) / 32;
-    WarpSortKernel<<<particleBlockCount, 32, 0, stream>>>(particleBlocks, particleCount, blockCodeToIndex, cellSize, particleHomeBlockCodes);
+    WarpSortKernel<<<particleBlockCount, 32, 0, stream>>>(particleBlocks, particleCount, blockCodeToIndex, particleHomeBlockCodes);
 }
 
-void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes, const cudaStream_t stream)
+void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes, const cudaStream_t stream)
 {
     constexpr int threadsPerBlock = 256;
     const int threadBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
@@ -248,7 +249,7 @@ void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks
     InitIndicesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(indices, particleCount);
     CUDA_CHECK(cudaGetLastError());
 
-    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys, cellSize);
+    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys);
     CUDA_CHECK(cudaGetLastError());
 
     CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount, 0, sizeof(uint64_t) * 8, stream));
