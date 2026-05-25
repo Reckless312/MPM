@@ -17,6 +17,7 @@
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
+#include "OpenGL/Shaders/TextureLoader.h"
 #include "OpenGL/Simulation/SnowVolume.h"
 
 void SetSceneLighting(const Shader& sceneShader);
@@ -66,7 +67,6 @@ int main()
     Model sledModel(std::string(ASSETS_PATH) + "/sled.obj");
     Model floorModel(std::string(ASSETS_PATH) + "/floor.obj");
 
-    std::cout << "Loading models..." << std::endl;
     try
     {
         logoUBB.loadModel();
@@ -77,7 +77,6 @@ int main()
     {
         return Program::ReportErrorAndTerminate(exception);
     }
-    std::cout << "Models loaded." << std::endl;
 
     constexpr glm::vec3 snowfallLowerLeft(0.5f, 3.0f, 2.1f);
     constexpr glm::vec3 snowfallUpperRight(4.6f, 4.5f, 3.1f);
@@ -90,7 +89,6 @@ int main()
     SnowVolume snowfall(snowfallLowerLeft, snowfallUpperRight, snowfallParticleCount);
     SnowVolume snowLayer(snowLayerLowerLeft, snowLayerUpperRight, snowLayerParticleCount);
 
-    std::cout << "Building particle volumes..." << std::endl;
     try
     {
         snowfall.BuildInitialPositions();
@@ -103,7 +101,6 @@ int main()
     {
         return Program::ReportErrorAndTerminate(exception);
     }
-    std::cout << "Particle volumes built." << std::endl;
 
     Particle snowfallParticles(snowfall.initialPositions);
     Particle snowLayerParticles(snowLayer.initialPositions);
@@ -112,16 +109,12 @@ int main()
     Simulation snowLayerSimulation(snowLayer, snowLayerParticles.GetVBO());
 
     glm::mat4 logoModelMatrix = GetLogoLocalMatrix();
-    std::cout << "Voxelizing logo SDF..." << std::endl;
     MeshSDF logoSDF = GetMeshSDF(logoUBB, logoModelMatrix);
     snowfallSimulation.UploadMeshBoundary(logoSDF);
-    std::cout << "Logo SDF done." << std::endl;
 
     glm::mat4 sledModelMatrix = GetSledLocalMatrix();
-    std::cout << "Voxelizing sled SDF..." << std::endl;
     MeshSDF sledSDF = GetMeshSDF(sledModel, sledModelMatrix);
     snowLayerSimulation.UploadMeshBoundary(sledSDF);
-    std::cout << "Sled SDF done. Starting render loop." << std::endl;
 
     glm::vec3 cameraPosition(2.56f, 1.5f, 7.5f);
     float cameraYaw = -90.0f;
@@ -151,6 +144,12 @@ int main()
 
     constexpr glm::vec4 backgroundColor(0.04f, 0.07f, 0.15f, 1.0f);
     glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
+
+    constexpr int shellCount = 8;
+    constexpr float shellInnerFraction = 0.85f;
+
+    GLuint shellColorTex    = TextureLoader::LoadTextureArray(ASSETS_PATH "/crystal_color.png",    shellCount);
+    GLuint shellSpecularTex = TextureLoader::LoadTextureArray(ASSETS_PATH "/crystal_specular.png", shellCount);
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -264,8 +263,22 @@ int main()
         shellShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
         shellShader.SetVec3("lightDirEye", lightDirEye);
 
-        shellShader.SetFloat("sphereRadius", Program::particleShellRadius);
-        activeParticles->Draw(shellShader);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shellColorTex);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shellSpecularTex);
+        shellShader.SetInt("shellColorTextures", 0);
+        shellShader.SetInt("shellSpecularTextures", 1);
+        shellShader.SetInt("totalShells", shellCount);
+
+        for (int shell = shellCount - 1; shell >= 0; shell--)
+        {
+            const float t = static_cast<float>(shell) / static_cast<float>(shellCount - 1);
+            const float shellFraction = shellInnerFraction + (1.0f - shellInnerFraction) * t;
+            shellShader.SetFloat("sphereRadius", Program::particleShellRadius * shellFraction);
+            shellShader.SetInt("currentShell", shell);
+            activeParticles->Draw(shellShader);
+        }
 
         if (!recorder)
         {

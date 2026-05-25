@@ -14,6 +14,7 @@ public:
     void Bind(GLenum textureUnit) const;
 
     static unsigned int StaticLoad(const std::string &path, const std::string &directory);
+    static GLuint LoadTextureArray(const char* path, int layerCount);
 private:
     GLuint id;
 
