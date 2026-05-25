@@ -9,6 +9,7 @@ Camera::Camera(GLFWwindow* window)
 
     int framebufferWidth, framebufferHeight;
     glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
+
     this->mouseXDirection = static_cast<float>(framebufferWidth) / 2.0f;
     this->mouseYDirection = static_cast<float>(framebufferHeight) / 2.0f;
 
@@ -35,7 +36,8 @@ void Camera::UpdateProjectionMatrix()
 {
     int framebufferWidth, framebufferHeight;
     glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
-    float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+
+    const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
     this->projectionMatrix = glm::perspective(glm::radians(this->fov), aspectRatio, this->nearPlane, this->farPlane);
 }
 
@@ -125,7 +127,6 @@ void Camera::UpdateMousePosition(const float currentXDirection, const float curr
 
     this->yaw += xDirectionOffset;
 
-    // Invert up and down
     this->UpdatePitch(-yDirectionOffset);
     this->UpdateDirection();
 }

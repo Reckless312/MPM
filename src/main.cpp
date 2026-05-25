@@ -20,6 +20,8 @@
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/SnowVolume.h"
 
+void SetSceneLighting(const Shader& sceneShader);
+
 int main()
 {
     Program program;
@@ -42,13 +44,11 @@ int main()
     camera.AssignUserPointerAndSetCallbacks();
 
     Shader sceneShader("vertexShader.vs", "fragmentShader.fs");
-    Shader particleShader("particleVertex.vs", "particleFragment.fs");
     Shader shellShader("shellVertex.vs", "shellFragment.fs");
 
     try
     {
         sceneShader.Load();
-        particleShader.Load();
         shellShader.Load();
     }
     catch (const MPMException& exception)
@@ -56,20 +56,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    sceneShader.Use();
-
-    glm::vec3 direction = glm::vec3(-0.2f, -1.0f, -0.3f);
-    glm::vec3 ambient = glm::vec3(0.5f, 0.5f, 0.5f);
-    glm::vec3 diffuse = glm::vec3(0.8f, 0.8f, 0.8f);
-    glm::vec3 specular = glm::vec3(1.0f, 1.0f, 1.0f);
-
-    float shininess = 32.0f;
-
-    sceneShader.SetVec3("directionalLight.direction", direction);
-    sceneShader.SetVec3("directionalLight.ambient", ambient);
-    sceneShader.SetVec3("directionalLight.diffuse", diffuse);
-    sceneShader.SetVec3("directionalLight.specular", specular);
-    sceneShader.SetFloat("material.shininess", shininess);
+    SetSceneLighting(sceneShader);
 
     Model logoUBB(std::string(ASSETS_PATH) + "/ubb_logo.obj");
 
@@ -167,6 +154,9 @@ int main()
 
     ShellTexture shellTexture(ASSETS_PATH "/crystal_color.png", ASSETS_PATH "/crystal_specular.png", 8);
 
+    constexpr float particleShellRadius = 0.018f;
+    constexpr float shellInnerFraction = 0.85f;
+
     int activeScene = 1;
 
     int recordingScene = 1;
@@ -181,7 +171,7 @@ int main()
     {
         program.UpdateDeltaTime();
 
-        if (program.WasFirstSceneSelected())
+        if (program.IsKeyJustPressed(GLFW_KEY_1))
         {
             activeScene = 1;
             SimulationConfig::SwitchScenesParameters(1);
@@ -191,7 +181,7 @@ int main()
             camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 7.5f), -90.0f, 0.0f);
         }
 
-        if (program.WasSecondSceneSelected())
+        if (program.IsKeyJustPressed(GLFW_KEY_2))
         {
             activeScene = 2;
             SimulationConfig::SwitchScenesParameters(2);
@@ -202,13 +192,10 @@ int main()
             camera.SetInitialOrientation(glm::vec3(-0.400f, 2.218f, 3.051f), -0.40f, -35.00f);
         }
 
-        if (program.WasPauseKeyPressed())
+        if (program.IsKeyJustPressed(GLFW_KEY_SPACE))
         {
             program.SwitchPause();
         }
-
-        program.UpdateKeyStates();
-        program.UpdateFPSOnWindowTitle();
 
         camera.UpdateSpeed(program.deltaTime);
 
@@ -283,7 +270,7 @@ int main()
 
         const glm::mat4 viewMatrix = camera.GetViewMatrix();
         const glm::mat4 projMatrix = camera.GetProjectionMatrix();
-        const glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(direction, 0.0f)));
+        const glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(glm::vec3(-0.2f, -1.0f, -0.3f), 0.0f)));
 
         shellShader.SetMat4("view", viewMatrix);
         shellShader.SetMat4("projection", projMatrix);
@@ -295,8 +282,8 @@ int main()
         for (int shell = shellTexture.shellCount - 1; shell >= 0; shell--)
         {
             const float t = static_cast<float>(shell) / static_cast<float>(shellTexture.shellCount - 1);
-            const float shellFraction = Program::shellInnerFraction + (1.0f - Program::shellInnerFraction) * t;
-            shellShader.SetFloat("sphereRadius", Program::particleShellRadius * shellFraction);
+            const float shellFraction = shellInnerFraction + (1.0f - shellInnerFraction) * t;
+            shellShader.SetFloat("sphereRadius", particleShellRadius * shellFraction);
             shellShader.SetInt("currentShell", shell);
             snowfallParticles.Draw(shellShader);
         }
@@ -338,4 +325,15 @@ int main()
     }
 
     return 0;
+}
+
+void SetSceneLighting(const Shader& sceneShader)
+{
+    sceneShader.Use();
+
+    sceneShader.SetVec3("directionalLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
+    sceneShader.SetVec3("directionalLight.ambient", glm::vec3(0.5f, 0.5f, 0.5f));
+    sceneShader.SetVec3("directionalLight.diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
+    sceneShader.SetVec3("directionalLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+    sceneShader.SetFloat("material.shininess", 32.0f);
 }

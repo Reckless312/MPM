@@ -40,7 +40,6 @@ private:
 
     bool firstMouse = true;
 
-    /* Camera Settings */
     float speed = 5.0f;
     float yaw = -90.0f;
     float pitch = 0.0f;
@@ -54,7 +53,6 @@ private:
     const float minPitch = -89.0f;
     const float maxFov = 90.0f;
     const float minFov = 10.0f;
-    /* ---- */
 
     void UpdateDirection();
     void UpdateViewMatrix();
