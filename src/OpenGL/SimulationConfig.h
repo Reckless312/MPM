@@ -10,6 +10,7 @@ namespace SimulationConfig
 {
     inline constexpr int maxBlocks = 16384;
     inline constexpr int cellCountPerAxis = 256;
+    inline constexpr int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
     inline constexpr float cellSize = 0.02f;
 
     inline static float physicsTimeStep = 3.8e-4f;

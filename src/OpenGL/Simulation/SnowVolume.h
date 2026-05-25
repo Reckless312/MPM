@@ -27,9 +27,6 @@ private:
     float snowDensity = 400.0f;
     float particleVolume = 0.0f;
     float particleMass = 0.0f;
-public:
-    float GetParticleVolume() const { return particleVolume; }
-    float GetParticleMass() const { return particleMass; }
 };
 
 #endif

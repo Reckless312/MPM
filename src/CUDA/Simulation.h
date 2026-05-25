@@ -25,16 +25,14 @@ public:
     ~Simulation();
     void Step();
     void SyncPositionsToVBO();
-    [[nodiscard]] int GetParticleCount() const;
-    [[nodiscard]] int GetAllocatedParticleCount() const;
     void UploadMeshBoundary(const MeshSDF& sdf) const;
     void ClearMeshBoundary() const;
     void SetBoundaryVelocity(glm::vec3 velocity);
     void UpdatePhysicsParams();
-    void ShiftSdfZ(int cells);
+    void ShiftSdfZ(int cells) const;
     void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
-    void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
-    int Grow();
+    void AddParticles(const ParticleBlock* blocks, int additionalParticleCount);
+    void Grow();
     void RebindVBO();
 
 private:
@@ -66,7 +64,7 @@ private:
     float* sdfDistances{};
     glm::vec3* sdfNormals{};
 
-    SimParameters hostSimParams{};
+    SimParameters hostSimulationParameters{};
 
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};
@@ -75,6 +73,10 @@ private:
     void AllocateParticleBuffers(int count);
     void FreeParticleBuffers() const;
     void UploadSimParams() const;
+    void SetRebuildFlag() const;
+    void DestroyGraph();
+    static int ParticlesToBlocks(int count);
+    int ParticleLaunchBlocks() const;
 
     const int threadsPerBlock = 128;
 
