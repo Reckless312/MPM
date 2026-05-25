@@ -1,5 +1,5 @@
-#ifndef MPM_METHOD_SNOWFALL_H
-#define MPM_METHOD_SNOWFALL_H
+#ifndef MPM_METHOD_SNOW_VOLUME_H
+#define MPM_METHOD_SNOW_VOLUME_H
 
 #include <vector>
 
@@ -7,7 +7,7 @@
 
 #include "CUDA/Structures/ParticleBuffer.h"
 
-class Snowfall
+class SnowVolume
 {
 public:
     std::vector<glm::vec3> initialPositions{};
@@ -15,12 +15,14 @@ public:
 
     int particleCount = 100000;
 
+    SnowVolume(glm::vec3 lowerLeftBoxCorner, glm::vec3 upperRightBoxCorner);
+
     void BuildInitialPositions();
     void BuildParticleBlocks();
 
 private:
-    glm::vec3 lowerLeftBoxCorner = glm::vec3(0.5f, 3.0f, 2.1f);
-    glm::vec3 upperRightBoxCorner = glm::vec3(4.6f, 4.5f, 3.1f);
+    glm::vec3 lowerLeftBoxCorner;
+    glm::vec3 upperRightBoxCorner;
 
     float snowDensity = 400.0f;
     float particleVolume = 0.0f;

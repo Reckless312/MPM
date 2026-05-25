@@ -27,6 +27,11 @@ void Program::InitializeGLFW()
 
     if (const int isInitialized = glfwInit(); isInitialized != GLFW_TRUE)
     {
+        if (const int errorCode = glfwGetError(nullptr); errorCode == GLFW_PLATFORM_UNAVAILABLE)
+        {
+            throw MPMException("Platform specified is not correct! Please update with the right information.", Error::WrongPlatform);
+        }
+
         throw MPMException("Failed to initialize GLFW.", Error::GLFWInitialization);
     }
 
@@ -34,6 +39,11 @@ void Program::InitializeGLFW()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Program::minorVersion);
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, Program::profile);
+
+    if (Program::recordingMode)
+    {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    }
 }
 
 void Program::CreateWindowAndAssignContext()
@@ -154,9 +164,4 @@ void Program::UpdateFPSOnWindowTitle() const
         const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
         glfwSetWindowTitle(this->window, title.c_str());
     }
-}
-
-int Program::RecordingSubstepsPerFrame()
-{
-    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * SimulationConfig::physicsTimeStep)));
 }

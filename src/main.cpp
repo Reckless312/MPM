@@ -18,8 +18,7 @@
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Shaders/Shader.h"
-#include "OpenGL/Simulation/Snowfall.h"
-#include "OpenGL/Simulation/SnowLayer.h"
+#include "OpenGL/Simulation/SnowVolume.h"
 
 int main()
 {
@@ -28,10 +27,6 @@ int main()
     try
     {
         Program::InitializeGLFW();
-        if (Program::recordingMode)
-        {
-            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        }
         program.CreateWindowAndAssignContext();
         Program::LoadGladLibrary();
     }
@@ -87,7 +82,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    Snowfall snowfall;
+    SnowVolume snowfall(glm::vec3(0.5f, 3.0f, 2.1f), glm::vec3(4.6f, 4.5f, 3.1f));
 
     try
     {
@@ -99,7 +94,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    SnowLayer snowLayer;
+    SnowVolume snowLayer(glm::vec3(1.5f, 0.04f, 1.5f), glm::vec3(3.6f, 0.2f, 3.6f));
 
     try
     {
@@ -173,7 +168,6 @@ int main()
     IceCrystalTexture iceCrystalTexture;
 
     int activeScene = 1;
-    const int substepsPerFrame = Program::recordingMode ? Program::RecordingSubstepsPerFrame() : 5;
 
     int recordingScene = 1;
     std::optional<VideoRecorder> recorder;
@@ -223,7 +217,7 @@ int main()
 
         if (!program.IsPaused())
         {
-            for (int step = 0; step < substepsPerFrame; step++)
+            for (int step = 0; step < SimulationConfig::simulationSubsteps; step++)
             {
                 if (activeScene == 2)
                 {

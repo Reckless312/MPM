@@ -25,8 +25,8 @@ public:
     inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/scene2.mp4";
 
     /* Particle Rendering */
-    inline static constexpr float particleShellRadius = 0.018f;
-    inline static constexpr float shellInnerFraction = 0.85f;
+    static constexpr float particleShellRadius = 0.018f;
+    static constexpr float shellInnerFraction = 0.85f;
     /* ---- */
 
     explicit Program();
@@ -46,7 +46,6 @@ public:
     [[nodiscard]] bool WasPauseKeyPressed() const;
     [[nodiscard]] bool IsPaused() const;
 
-    static int RecordingSubstepsPerFrame();
     static void InitializeGLFW();
     static void LoadGladLibrary();
     static void ResizeWindow(GLFWwindow* window, int width, int height);
@@ -59,14 +58,10 @@ private:
     static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
     static constexpr int glfwPlatform = GLFW_PLATFORM_X11;
 
-    static constexpr GLFWmonitor* fullscreenMonitor = nullptr;
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 
     static constexpr GLint viewportBottomLeftX = 0;
     static constexpr GLint viewportBottomLeftY = 0;
-
-    static constexpr GLsizei windowWidth = 800;
-    static constexpr GLsizei windowHeight = 600;
 
     inline static const char* windowTitle = "MPM Snow Simulation";
     /* ---- */

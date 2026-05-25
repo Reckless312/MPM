@@ -1,4 +1,4 @@
-#include "SnowLayer.h"
+#include "SnowVolume.h"
 
 #include <cstring>
 #include <random>
@@ -6,7 +6,12 @@
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 
-void SnowLayer::BuildInitialPositions()
+SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner)
+    : lowerLeftBoxCorner(lowerLeftBoxCorner), upperRightBoxCorner(upperRightBoxCorner)
+{
+}
+
+void SnowVolume::BuildInitialPositions()
 {
     const glm::vec3 boxDiagonal = upperRightBoxCorner - lowerLeftBoxCorner;
     const float boxVolume = boxDiagonal.x * boxDiagonal.y * boxDiagonal.z;
@@ -36,7 +41,7 @@ void SnowLayer::BuildInitialPositions()
     }
 }
 
-void SnowLayer::BuildParticleBlocks()
+void SnowVolume::BuildParticleBlocks()
 {
     const int blockCount = (this->particleCount + 31) / 32;
 

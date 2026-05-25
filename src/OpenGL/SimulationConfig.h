@@ -1,7 +1,10 @@
 #ifndef MPM_METHOD_SIMULATIONCONFIG_H
 #define MPM_METHOD_SIMULATIONCONFIG_H
 
+#include <cmath>
 #include <iostream>
+
+#include "Program.h"
 
 namespace SimulationConfig
 {
@@ -18,6 +21,9 @@ namespace SimulationConfig
     inline float criticalCompression = 0.025f;
     inline float criticalStretch = 0.0075f;
     inline float boundaryFriction = 0.8f;
+    
+    inline int defaultSimulationSubsteps = 5;
+    inline int simulationSubsteps = Program::recordingMode ? static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * SimulationConfig::physicsTimeStep))) : defaultSimulationSubsteps;
 
     inline void UpdateParameters(const float newFirstLameParameter, const float newSecondLameParameter, const float newHardeningCoefficient, const float newCriticalCompression, const float newCriticalStretch)
     {
