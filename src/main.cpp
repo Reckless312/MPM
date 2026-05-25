@@ -13,7 +13,7 @@
 #include "OpenGL/Program.h"
 #include "OpenGL/SimulationConfig.h"
 #include "OpenGL/Render/Model.h"
-#include "OpenGL/Render/IceCrystalTexture.h"
+#include "OpenGL/Render/ShellTexture.h"
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
@@ -165,7 +165,7 @@ int main()
     glEnable(GL_PROGRAM_POINT_SIZE);
     glClearColor(0.04f, 0.07f, 0.15f, 1.0f);
 
-    IceCrystalTexture iceCrystalTexture;
+    ShellTexture shellTexture(ASSETS_PATH "/crystal_color.png", ASSETS_PATH "/crystal_specular.png", 8);
 
     int activeScene = 1;
 
@@ -290,11 +290,11 @@ int main()
         shellShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
         shellShader.SetVec3("lightDirEye", lightDirEye);
 
-        iceCrystalTexture.Bind(shellShader);
+        shellTexture.Bind(shellShader);
 
-        for (int shell = IceCrystalTexture::shellCount - 1; shell >= 0; shell--)
+        for (int shell = shellTexture.shellCount - 1; shell >= 0; shell--)
         {
-            const float t = static_cast<float>(shell) / static_cast<float>(IceCrystalTexture::shellCount - 1);
+            const float t = static_cast<float>(shell) / static_cast<float>(shellTexture.shellCount - 1);
             const float shellFraction = Program::shellInnerFraction + (1.0f - Program::shellInnerFraction) * t;
             shellShader.SetFloat("sphereRadius", Program::particleShellRadius * shellFraction);
             shellShader.SetInt("currentShell", shell);
