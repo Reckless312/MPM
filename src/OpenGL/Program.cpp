@@ -4,6 +4,7 @@
 
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
+#include "SimulationConfig.h"
 
 Program::Program()
 {
@@ -157,14 +158,5 @@ void Program::UpdateFPSOnWindowTitle() const
 
 int Program::RecordingSubstepsPerFrame()
 {
-    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * physicsTimeStep)));
-}
-
-void Program::ApplySceneParameters(const SceneParameters& sceneParameters)
-{
-    firstLameParameter = sceneParameters.firstLameParameter;
-    secondLameParameter = sceneParameters.secondLameParameter;
-    hardeningCoefficient = sceneParameters.hardeningCoefficient;
-    criticalCompression = sceneParameters.criticalCompression;
-    criticalStretch = sceneParameters.criticalStretch;
+    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * SimulationConfig::physicsTimeStep)));
 }

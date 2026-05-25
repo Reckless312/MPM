@@ -2,7 +2,7 @@
 #include "../Structures/Morton.h"
 #include "../Preparation/RebuildMapping.h"
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction, const float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals, const glm::vec3* boundaryVelocity)
+__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const int gridSizeInCells, const float boundaryFriction, const float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals, const glm::vec3* boundaryVelocity)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -36,6 +36,7 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
     float velocityY = gridBlocks[gridBlockIndex].velocityY[nodeLane] / nodeMass;
     float velocityZ = gridBlocks[gridBlockIndex].velocityZ[nodeLane] / nodeMass;
 
+    constexpr float gravity = 9.8f;
     velocityY -= gravity * deltaTime;
 
     const float tangentialScale = 1.0f - boundaryFriction;

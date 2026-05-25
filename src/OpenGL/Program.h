@@ -6,15 +6,6 @@
 
 #include "Exceptions/MPMException.h"
 
-struct SceneParameters
-{
-    float firstLameParameter;
-    float secondLameParameter;
-    float hardeningCoefficient;
-    float criticalCompression;
-    float criticalStretch;
-};
-
 class Program
 {
 public:
@@ -27,23 +18,11 @@ public:
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
 
-    inline static int maxBlocks = 16384;
-    inline static int cellCountPerAxis = 256;
-    inline static float cellSize = 0.02f;
-    inline static float physicsTimeStep = 3e-4f;
-    //inline static float physicsTimeStep = 1e-4f;
-    inline static float gravity = 9.8f;
     inline static bool recordingMode = false;
     inline static int recordingFrameRate = 144;
     inline static int recordingDurationSeconds = 5;
     inline static const char* recordingOutputPathScene1 = "/home/cora/Videos/scene1.mp4";
     inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/scene2.mp4";
-    inline static float firstLameParameter = 1.333e4f;
-    inline static float secondLameParameter = 2.0e4f;
-    inline static float hardeningCoefficient = 10.0f;
-    inline static float criticalCompression = 0.025f;
-    inline static float criticalStretch = 0.0075f;
-    inline static float boundaryFriction = 0.8f;
 
     /* Particle Rendering */
     inline static constexpr float particleShellRadius = 0.018f;
@@ -67,7 +46,6 @@ public:
     [[nodiscard]] bool WasPauseKeyPressed() const;
     [[nodiscard]] bool IsPaused() const;
 
-    static void ApplySceneParameters(const SceneParameters& sceneParameters);
     static int RecordingSubstepsPerFrame();
     static void InitializeGLFW();
     static void LoadGladLibrary();
