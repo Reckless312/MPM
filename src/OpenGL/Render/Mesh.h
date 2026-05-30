@@ -28,6 +28,12 @@ public:
     Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures);
     ~Mesh();
 
+    Mesh(Mesh&& other) noexcept;
+    Mesh& operator=(Mesh&& other) noexcept;
+
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+
     [[nodiscard]] std::vector<std::vector<glm::vec3>> GetTriangles() const;
 
     void Draw(const Shader &shader) const;

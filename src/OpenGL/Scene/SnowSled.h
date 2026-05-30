@@ -16,10 +16,10 @@ namespace SnowSled
 
     inline constexpr float zMargin = 1.0f;
     inline constexpr float sledSpeed = 3.0f;
+    inline constexpr float sledCenterX = 2.1f;
     inline constexpr float cameraYaw = -0.40f;
     inline constexpr float snowDensity = 400.0f;
     inline constexpr float cameraPitch = -35.00f;
-    inline constexpr float sledCenterX = 2.1f;
     inline constexpr float sledEndZ = boxRightCorner.z + zMargin;
     inline constexpr float sledInitialZ = boxLeftCorner.z - zMargin;
 
@@ -33,9 +33,9 @@ namespace SnowSled
         return glm::translate(glm::mat4(1.0f), glm::vec3(2.1f, 0.04f, sledCenterZ));
     }
 
-    inline void SetLogoUniforms(const Shader &shader, const glm::mat4 &model)
+    inline void SetLogoUniforms(const Shader &shader)
     {
-        const glm::mat4 sledMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledCenterZ)) * model;
+        const glm::mat4 sledMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledCenterZ));
         const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(sledMatrix)));
 
         shader.SetMat4("model", sledMatrix);

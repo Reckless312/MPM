@@ -40,6 +40,25 @@ glm::vec3 Camera::GetPosition() const
     return this->position;
 }
 
+void Camera::ChangeOrientationOnScene(GLFWwindow *window, const int scene)
+{
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
+    {
+        if (scene == 1)
+        {
+            camera->SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
+        }
+        else if (scene == 2)
+        {
+            camera->SetInitialOrientation(SnowSled::cameraPosition, SnowSled::cameraYaw, SnowSled::cameraPitch);
+        }
+    }
+    else
+    {
+        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
+    }
+}
+
 void Camera::ScrollCallback(GLFWwindow *window, double xOffset, const double yOffset)
 {
     if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
@@ -58,25 +77,6 @@ void Camera::MouseCallback(GLFWwindow *window, const double xPosition, const dou
     if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
     {
         camera->UpdateMousePosition(static_cast<float>(xPosition), static_cast<float>(yPosition));
-    }
-    else
-    {
-        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
-    }
-}
-
-void Camera::ChangeOrientationOnScene(GLFWwindow *window, const int scene)
-{
-    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
-    {
-        if (scene == 1)
-        {
-            camera->SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
-        }
-        else if (scene == 2)
-        {
-            camera->SetInitialOrientation(SnowSled::cameraPosition, SnowSled::cameraYaw, SnowSled::cameraPitch);
-        }
     }
     else
     {

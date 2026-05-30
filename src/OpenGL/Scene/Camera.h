@@ -1,6 +1,7 @@
 #ifndef MPM_METHOD_CAMERA_H
 #define MPM_METHOD_CAMERA_H
 
+#include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/vec3.hpp>
 #include <glm/mat4x4.hpp>
@@ -15,10 +16,9 @@ public:
 
     [[nodiscard]] glm::vec3 GetPosition() const;
 
+    static void ChangeOrientationOnScene(GLFWwindow *window, int scene);
     static void ScrollCallback(GLFWwindow* window, double xOffset, double yOffset);
     static void MouseCallback(GLFWwindow* window, double xPosition, double yPosition);
-
-    static void ChangeOrientationOnScene(GLFWwindow *window, int scene);
 
     void ProcessInput();
     void UpdateProjectionMatrix();

@@ -1,9 +1,9 @@
 #include "Simulation.h"
 
+#include <glad/glad.h>
 #include <cuda_gl_interop.h>
 #include <utility>
 #include <cub/cub.cuh>
-#include <glad/glad.h>
 #include "CudaCheck.h"
 #include "WritePositionsKernel.h"
 #include "MPM/G2P.h"

@@ -15,8 +15,6 @@ namespace TextureLoader
     inline GLuint Load(const std::string& path, const std::string& directory)
     {
         int width, height, nrChannels;
-        stbi_set_flip_vertically_on_load(true);
-
         const std::string fullPath = directory + "/" + path;
         unsigned char* data = stbi_load(fullPath.c_str(), &width, &height, &nrChannels, 0);
 

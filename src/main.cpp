@@ -75,7 +75,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    ShellTexture shellTexture("/crystal_color.png", "/crystal_specular.png");
+    ShellTexture shellTexture("/Snow/crystal_color.png", "/Snow/crystal_specular.png");
 
     try
     {
@@ -198,7 +198,7 @@ int main()
 
         if (program.GetActiveScene() == 2)
         {
-            SnowSled::SetLogoUniforms(sceneShader, sledModelMatrix);
+            SnowSled::SetLogoUniforms(sceneShader);
             sled.Draw(sceneShader);
         }
 

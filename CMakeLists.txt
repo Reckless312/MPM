@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 4.1)
 project(MPM_Method LANGUAGES C CXX CUDA)
 
+find_package(CUDAToolkit REQUIRED)
+
 set(CMAKE_CUDA_STANDARD 20)
 
 set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
@@ -68,7 +70,7 @@ set_target_properties(MPM_Method PROPERTIES
 
 target_compile_options(MPM_Method PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-use_fast_math>)
 
-target_include_directories(MPM_Method PUBLIC src src/Libraries/include)
+target_include_directories(MPM_Method PUBLIC src src/Libraries/include ${CUDAToolkit_INCLUDE_DIRS})
 
 target_compile_definitions(MPM_Method PRIVATE
         ASSETS_PATH="${CMAKE_SOURCE_DIR}/src/Assets"

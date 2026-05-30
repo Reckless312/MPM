@@ -18,6 +18,35 @@ Mesh::~Mesh()
     glDeleteBuffers(1, &this->EBO);
 }
 
+Mesh::Mesh(Mesh&& other) noexcept
+{
+    *this = std::move(other);
+}
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept
+{
+    if (this != &other)
+    {
+        glDeleteVertexArrays(1, &this->VAO);
+        glDeleteBuffers(1, &this->VBO);
+        glDeleteBuffers(1, &this->EBO);
+
+        this->vertices = std::move(other.vertices);
+        this->textures = std::move(other.textures);
+        this->indices = std::move(other.indices);
+
+        this->VAO = other.VAO;
+        this->VBO = other.VBO;
+        this->EBO = other.EBO;
+
+        other.VAO = 0;
+        other.VBO = 0;
+        other.EBO = 0;
+    }
+
+    return *this;
+}
+
 std::vector<std::vector<glm::vec3>> Mesh::GetTriangles() const
 {
     std::vector<std::vector<glm::vec3>> triangles;
