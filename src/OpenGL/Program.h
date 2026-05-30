@@ -1,12 +1,17 @@
 #ifndef MPM_METHOD_PROGRAM_H
 #define MPM_METHOD_PROGRAM_H
 
+#include <array>
 #include <map>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include "CUDA/Simulation.h"
 #include "Exceptions/MPMException.h"
+#include "Render/Particle.h"
+#include "Simulation/MeshBoundary.h"
+#include "Simulation/SnowVolume.h"
 
 class Program
 {
@@ -21,21 +26,29 @@ public:
     inline static bool recordingMode = false;
     inline static int recordingFrameRate = 144;
     inline static int recordingDurationSeconds = 5;
-    inline static const char* recordingOutputPathScene1 = "/home/cora/Videos/logo_scene.mp4";
-    inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/sled_scene.mp4";
+    inline static const char* logoSceneOutputPath = "/home/cora/Videos/logo_scene.mp4";
+    inline static const char* sledSceneOutputPath = "/home/cora/Videos/sled_scene.mp4";
 
     explicit Program();
     ~Program();
 
-    void SwitchPause();
-    void ProcessInput() const;
+    void ProcessInput(Simulation*& activeSimulation, Particle*& activeParticles, const std::array<Simulation*, 3> &simulations, const std::array<const MeshSDF*, 3> &boundarySDFs, const std::array<Particle*, 3> &particles, const std::array<const SnowVolume*, 3> &snowVolumes);
     void UpdateDeltaTime();
     void LockCursor() const;
     void CreateWindowAndAssignContext();
     void SetViewportAndResizeCallback() const;
+    void ChangeScene(int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume);
 
     [[nodiscard]] bool IsKeyJustPressed(int key);
     [[nodiscard]] bool IsPaused() const;
+
+    void SetActiveScene(int scene);
+    void SetRecordingScene(int scene);
+    void SetSceneUniforms(const Shader& shader) const;
+
+    static void SetFloorUniforms(const Shader& shader);
+    [[nodiscard]] int GetActiveScene() const;
+    [[nodiscard]] int GetRecordingScene() const;
 
     static void InitializeGLFW();
     static void LoadGladLibrary();
@@ -48,6 +61,9 @@ private:
     float lastFrame = 0.0f;
 
     bool paused = false;
+
+    int activeScene = 1;
+    int recordingScene = 1;
 
     static constexpr int majorVersion = 3;
     static constexpr int minorVersion = 3;

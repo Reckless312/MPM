@@ -4,7 +4,7 @@
 #include <cmath>
 #include <iostream>
 
-#include "Program.h"
+#include "../Program.h"
 
 namespace SimulationConfig
 {
@@ -12,6 +12,7 @@ namespace SimulationConfig
     inline constexpr int cellCountPerAxis = 256;
     inline constexpr int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
     inline constexpr float cellSize = 0.02f;
+    inline constexpr float gridSize = cellCountPerAxis * cellSize;
 
     inline static float physicsTimeStep = 3.8e-4f;
     //inline static float physicsTimeStep = 1e-4f;
@@ -43,7 +44,7 @@ namespace SimulationConfig
                 SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f);
                 break;
             case 2:
-                SimulationConfig::UpdateParameters(1.5e4f, 2.5e4f, 3.0f, 0.025f, 0.0075f);
+                SimulationConfig::UpdateParameters(1.333e4f, 2.0e4f, 5.0f, 0.025f, 0.0075f);
                 break;
             case 3:
                 SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f);

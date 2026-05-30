@@ -10,23 +10,28 @@
 class SnowVolume
 {
 public:
-    std::vector<glm::vec3> initialPositions{};
-    std::vector<ParticleBlock> initialBlocks{};
+    SnowVolume(glm::vec3 lowerLeftBoxCorner, glm::vec3 upperRightBoxCorner, int particleCount, float snowDensity);
 
-    int particleCount;
+    [[nodiscard]] std::vector<glm::vec3> GetInitialPositions() const;
+    [[nodiscard]] std::vector<ParticleBlock> GetInitialBlocks() const;
 
-    SnowVolume(glm::vec3 lowerLeftBoxCorner, glm::vec3 upperRightBoxCorner, int particleCount);
+    [[nodiscard]] int GetParticleCount() const;
 
     void BuildInitialPositions();
     void BuildParticleBlocks();
 
 private:
-    glm::vec3 lowerLeftBoxCorner;
-    glm::vec3 upperRightBoxCorner;
+    glm::vec3 lowerLeftBoxCorner{};
+    glm::vec3 upperRightBoxCorner{};
 
-    float snowDensity = 400.0f;
+    std::vector<glm::vec3> initialPositions{};
+    std::vector<ParticleBlock> initialBlocks{};
+
     float particleVolume = 0.0f;
     float particleMass = 0.0f;
+    float snowDensity;
+
+    int particleCount;
 };
 
 #endif

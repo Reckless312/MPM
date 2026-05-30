@@ -11,12 +11,10 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/Exceptions/MPMException.cpp
         src/Exceptions/MPMException.h
         "src/Libraries/stb_image.cpp"
-        src/OpenGL/Shaders/TextureLoader.cpp
         src/OpenGL/Shaders/TextureLoader.h
         src/OpenGL/Scene/Camera.cpp
         src/OpenGL/Scene/Camera.h
         src/Exceptions/Error.h
-        src/OpenGL/Render/RenderObject.h
         src/OpenGL/Render/Mesh.cpp
         src/OpenGL/Render/Mesh.h
         src/OpenGL/Render/Model.cpp
@@ -33,13 +31,16 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/Preparation/RebuildMapping.cu
         src/CUDA/Preparation/SortParticles.h
         src/CUDA/Preparation/SortParticles.cu
+        src/CUDA/Preparation/ComputeHomeBlocks.h
+        src/CUDA/Preparation/ComputeHomeBlocks.cu
         src/CUDA/MPM/P2G.h
         src/CUDA/MPM/P2G.cu
         src/CUDA/MPM/UpdateGrid.h
         src/CUDA/MPM/UpdateGrid.cu
         src/CUDA/MPM/G2P.h
         src/CUDA/MPM/G2P.cu
-        src/CUDA/SimParameters.h
+        src/CUDA/MPM/MoveSDF.h
+        src/CUDA/MPM/MoveSDF.cu
         src/CUDA/Simulation.h
         src/CUDA/Simulation.cu
         src/CUDA/WritePositionsKernel.h
@@ -49,12 +50,15 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/CudaCheck.h
         src/OpenGL/Simulation/SnowVolume.cpp
         src/OpenGL/Simulation/SnowVolume.h
-        src/OpenGL/Render/RenderObject.cpp
         src/OpenGL/Render/VideoRecorder.h
         src/OpenGL/Render/VideoRecorder.cpp
         src/OpenGL/Render/ShellTexture.h
         src/OpenGL/Render/ShellTexture.cpp
-        src/OpenGL/SimulationConfig.h
+        src/OpenGL/Simulation/SimulationConfig.h
+        src/OpenGL/Scene/LogoSnowfall.h
+        src/OpenGL/Scene/SnowSled.h
+        src/OpenGL/Scene/SceneLighting.h
+        src/OpenGL/Scene/Snowfall.h
 )
 
 add_executable(MPM_Method ${SOURCE_FILES})

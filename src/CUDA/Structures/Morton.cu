@@ -1,5 +1,4 @@
 #include "Morton.h"
-#include <cuda_runtime.h>
 
 __device__ uint64_t ExpandBits(const uint32_t value)
 {
@@ -27,14 +26,14 @@ __device__ uint32_t CompactBits(uint64_t value)
     return static_cast<uint32_t>(value);
 }
 
+__device__ uint64_t MortonEncode(const int coordinateX, const int coordinateY, const int coordinateZ)
+{
+    return ExpandBits(static_cast<uint32_t>(coordinateX)) | (ExpandBits(static_cast<uint32_t>(coordinateY)) << 1) | (ExpandBits(static_cast<uint32_t>(coordinateZ)) << 2);
+}
+
 __device__ void MortonDecode(const uint64_t code, int& coordinateX, int& coordinateY, int& coordinateZ)
 {
     coordinateX = static_cast<int>(CompactBits(code));
     coordinateY = static_cast<int>(CompactBits(code >> 1));
     coordinateZ = static_cast<int>(CompactBits(code >> 2));
-}
-
-__device__ uint64_t MortonEncode(const int coordinateX, const int coordinateY, const int coordinateZ)
-{
-    return ExpandBits(static_cast<uint32_t>(coordinateX)) | (ExpandBits(static_cast<uint32_t>(coordinateY)) << 1) | (ExpandBits(static_cast<uint32_t>(coordinateZ)) << 2);
 }

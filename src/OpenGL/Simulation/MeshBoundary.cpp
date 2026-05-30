@@ -1,7 +1,6 @@
 #include "OpenGL/Simulation/MeshBoundary.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -81,7 +80,7 @@ glm::vec3 MeshBoundary::ClosestPointOnTriangle(glm::vec3 point, glm::vec3 v0, gl
     return v0 + e0 * normalizedWeightV1 + e1 * normalizedWeightV2;
 }
 
-MeshSDF MeshBoundary::Voxelize(const std::vector<std::array<glm::vec3, 3>>& triangles, const int cellCountPerAxis, const float cellSize)
+MeshSDF MeshBoundary::Voxelize(const std::vector<std::vector<glm::vec3>>& triangles, const int cellCountPerAxis, const float cellSize)
 {
     const int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
     const float narrowBand = 4.0f * cellSize;
@@ -136,7 +135,7 @@ MeshSDF MeshBoundary::Voxelize(const std::vector<std::array<glm::vec3, 3>>& tria
 
                         const int index = z * cellCountPerAxis * cellCountPerAxis + y * cellCountPerAxis + x;
 
-                        std::lock_guard<std::mutex> lock(mutexPool[index % mutexPoolSize]);
+                        std::lock_guard lock(mutexPool[index % mutexPoolSize]);
 
                         if (distance < std::abs(sdf.distances[index]))
                         {

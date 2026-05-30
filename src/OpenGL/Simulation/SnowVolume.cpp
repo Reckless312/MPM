@@ -6,14 +6,32 @@
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 
-SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner, const int particleCount)
-    : lowerLeftBoxCorner(lowerLeftBoxCorner), upperRightBoxCorner(upperRightBoxCorner), particleCount(particleCount)
+SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner, const int particleCount, const float snowDensity)
 {
+    this->lowerLeftBoxCorner = lowerLeftBoxCorner;
+    this->upperRightBoxCorner = upperRightBoxCorner;
+    this->particleCount = particleCount;
+    this->snowDensity = snowDensity;
+}
+
+std::vector<glm::vec3> SnowVolume::GetInitialPositions() const
+{
+    return this->initialPositions;
+}
+
+std::vector<ParticleBlock> SnowVolume::GetInitialBlocks() const
+{
+    return this->initialBlocks;
+}
+
+int SnowVolume::GetParticleCount() const
+{
+    return this->particleCount;
 }
 
 void SnowVolume::BuildInitialPositions()
 {
-    const glm::vec3 boxDiagonal = upperRightBoxCorner - lowerLeftBoxCorner;
+    const glm::vec3 boxDiagonal = this->upperRightBoxCorner - this->lowerLeftBoxCorner;
     const float boxVolume = boxDiagonal.x * boxDiagonal.y * boxDiagonal.z;
 
     this->particleVolume = boxVolume / static_cast<float>(this->particleCount);
@@ -22,9 +40,9 @@ void SnowVolume::BuildInitialPositions()
     std::random_device randomDevice;
     std::mt19937 randomEngine(randomDevice());
 
-    std::uniform_real_distribution distributionX(lowerLeftBoxCorner.x, upperRightBoxCorner.x);
-    std::uniform_real_distribution distributionY(lowerLeftBoxCorner.y, upperRightBoxCorner.y);
-    std::uniform_real_distribution distributionZ(lowerLeftBoxCorner.z, upperRightBoxCorner.z);
+    std::uniform_real_distribution distributionX(this->lowerLeftBoxCorner.x, this->upperRightBoxCorner.x);
+    std::uniform_real_distribution distributionY(this->lowerLeftBoxCorner.y, this->upperRightBoxCorner.y);
+    std::uniform_real_distribution distributionZ(this->lowerLeftBoxCorner.z, this->upperRightBoxCorner.z);
 
     try
     {
@@ -37,7 +55,7 @@ void SnowVolume::BuildInitialPositions()
 
     for (int particle = 0; particle < this->particleCount; particle++)
     {
-        initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
+        this->initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
     }
 }
 

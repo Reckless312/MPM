@@ -1,5 +1,6 @@
 #ifndef MPM_METHOD_PROGRAMEXCEPTION_H
 #define MPM_METHOD_PROGRAMEXCEPTION_H
+
 #include <exception>
 #include <string>
 

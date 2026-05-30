@@ -1,6 +1,6 @@
-#include <array>
-#include <glm/vec4.hpp>
 #include "OpenGL/Render/Mesh.h"
+
+#include <glm/vec4.hpp>
 
 Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> &indices, const std::vector<Texture> &textures)
 {
@@ -11,30 +11,23 @@ Mesh::Mesh(const std::vector<Vertex> &vertices, const std::vector<unsigned int> 
     this->setupMesh();
 }
 
-void Mesh::setupMesh()
+Mesh::~Mesh()
 {
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    glDeleteVertexArrays(1, &this->VAO);
+    glDeleteBuffers(1, &this->VBO);
+    glDeleteBuffers(1, &this->EBO);
+}
 
-    glBindVertexArray(VAO);
+std::vector<std::vector<glm::vec3>> Mesh::GetTriangles() const
+{
+    std::vector<std::vector<glm::vec3>> triangles;
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)), &vertices[0], GL_STATIC_DRAW);
+    for (size_t currentIndex = 0; currentIndex < this->indices.size(); currentIndex += 3)
+    {
+        triangles.push_back({this->vertices[this->indices[currentIndex]].Position, this->vertices[this->indices[currentIndex + 1]].Position, this->vertices[this->indices[currentIndex + 2]].Position});
+    }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(indices.size() * sizeof(unsigned int)), &indices[0], GL_STATIC_DRAW);
-
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), static_cast<void *>(nullptr));
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, Normal)));
-
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, TextureCoordinates)));
-
-    glBindVertexArray(0);
+    return triangles;
 }
 
 void Mesh::Draw(const Shader &shader) const
@@ -42,12 +35,12 @@ void Mesh::Draw(const Shader &shader) const
     unsigned int diffuseNumber = 1;
     unsigned int specularNumber = 1;
 
-    for (unsigned int textureId = 0; textureId < textures.size(); textureId++)
+    for (unsigned int textureId = 0; textureId < this->textures.size(); textureId++)
     {
         glActiveTexture(GL_TEXTURE0 + textureId);
 
         std::string number;
-        std::string name = textures[textureId].type;
+        std::string name = this->textures[textureId].type;
 
         if(name == "texture_diffuse")
         {
@@ -63,14 +56,14 @@ void Mesh::Draw(const Shader &shader) const
         materialName.append(number);
 
         shader.SetInt(materialName, static_cast<int>(textureId));
-        glBindTexture(GL_TEXTURE_2D, textures[textureId].id);
+        glBindTexture(GL_TEXTURE_2D, this->textures[textureId].id);
     }
 
     glActiveTexture(GL_TEXTURE0);
 
     bool hasDiffuse = false;
 
-    for (const auto& texture : textures)
+    for (const auto& texture : this->textures)
     {
         if (texture.type == "texture_diffuse")
         {
@@ -81,19 +74,33 @@ void Mesh::Draw(const Shader &shader) const
 
     shader.SetBool("hasDiffuseTexture", hasDiffuse);
 
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(this->VAO);
+    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(this->indices.size()), GL_UNSIGNED_INT, nullptr);
     glBindVertexArray(0);
 }
 
-std::vector<std::array<glm::vec3, 3>> Mesh::GetTriangles() const
+void Mesh::setupMesh()
 {
-    std::vector<std::array<glm::vec3, 3>> triangles;
+    glGenVertexArrays(1, &this->VAO);
+    glGenBuffers(1, &this->VBO);
+    glGenBuffers(1, &this->EBO);
 
-    for (size_t currentIndex = 0; currentIndex < indices.size(); currentIndex += 3)
-    {
-        triangles.push_back({vertices[indices[currentIndex]].Position, vertices[indices[currentIndex + 1]].Position, vertices[indices[currentIndex + 2]].Position});
-    }
+    glBindVertexArray(this->VAO);
 
-    return triangles;
+    glBindBuffer(GL_ARRAY_BUFFER, this->VBO);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(this->vertices.size() * sizeof(Vertex)), &this->vertices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(this->indices.size() * sizeof(unsigned int)), &this->indices[0], GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), static_cast<void *>(nullptr));
+
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, Normal)));
+
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, TextureCoordinates)));
+
+    glBindVertexArray(0);
 }

@@ -3,7 +3,7 @@
 
 #include <glm/vec3.hpp>
 
-struct SimParameters
+struct SimulationParameters
 {
     float cellSize;
     float deltaTime;
@@ -19,7 +19,7 @@ struct SimParameters
 };
 
 #ifdef __CUDACC__
-extern __constant__ SimParameters simulationParameters;
+extern __constant__ SimulationParameters simulationParameters;
 #endif
 
 #endif

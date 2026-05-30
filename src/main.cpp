@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <optional>
+#include <memory>
 #include <vector>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -11,16 +11,18 @@
 #include "CUDA/Simulation.h"
 #include "Exceptions/MPMException.h"
 #include "OpenGL/Program.h"
-#include "OpenGL/SimulationConfig.h"
+#include "OpenGL/Simulation/SimulationConfig.h"
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/ShellTexture.h"
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
+#include "OpenGL/Scene/LogoSnowfall.h"
+#include "OpenGL/Scene/SceneLighting.h"
+#include "OpenGL/Scene/Snowfall.h"
+#include "OpenGL/Scene/SnowSled.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/SnowVolume.h"
-
-void SetSceneLighting(const Shader& sceneShader);
 
 int main()
 {
@@ -56,16 +58,16 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    SetSceneLighting(sceneShader);
+    SceneLighting::Set(sceneShader);
 
-    Model logoUBB(std::string(ASSETS_PATH) + "/ubb_logo.obj");
-    Model sledModel(std::string(ASSETS_PATH) + "/sled.obj");
-    Model floorModel(std::string(ASSETS_PATH) + "/floor.obj");
+    Model logoUBB("/Logo/ubb_logo.obj");
+    Model sled("/Sled/sled.obj");
+    Model floorModel("/Floor/floor.obj");
 
     try
     {
         logoUBB.loadModel();
-        sledModel.loadModel();
+        sled.loadModel();
         floorModel.loadModel();
     }
     catch (const MPMException& exception)
@@ -73,155 +75,109 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    constexpr glm::vec3 snowfallLeftCorner(0.5f, 3.0f, 2.1f);
-    constexpr glm::vec3 snowfallRightCorner(4.6f, 4.5f, 3.1f);
-    constexpr int snowfallParticleCount = 60000;
-
-    constexpr glm::vec3 snowLayerLeftCorner(1.5f, 0.04f, 1.5f);
-    constexpr glm::vec3 snowLayerRightCorner(3.6f, 0.2f, 3.6f);
-    constexpr int snowLayerParticleCount = 60000;
-
-    SnowVolume snowfall(snowfallLeftCorner, snowfallRightCorner, snowfallParticleCount);
-    SnowVolume snowLayer(snowLayerLeftCorner, snowLayerRightCorner, snowLayerParticleCount);
+    ShellTexture shellTexture("/crystal_color.png", "/crystal_specular.png");
 
     try
     {
-        snowfall.BuildInitialPositions();
-        snowfall.BuildParticleBlocks();
-        snowLayer.BuildInitialPositions();
-        snowLayer.BuildParticleBlocks();
+        shellTexture.Load();
     }
     catch (const MPMException& exception)
     {
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    constexpr glm::mat4 logoTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(1.3f, 1.2f, 2.56f));
-    // Blender Moment
-    const glm::mat4 logoRotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    const glm::mat4 logoModelMatrix = logoTranslation * logoRotation;
+    SnowVolume logoSnowfall(LogoSnowfall::boxLeftCorner, LogoSnowfall::boxRightCorner, LogoSnowfall::particleCount, LogoSnowfall::snowDensity);
+    SnowVolume snowSledLayer(SnowSled::boxLeftCorner, SnowSled::boxRightCorner, SnowSled::particleCount, SnowSled::snowDensity);
+    SnowVolume snowfall(Snowfall::boxLeftCorner, Snowfall::boxRightCorner, Snowfall::particleCount, Snowfall::snowDensity);
 
-    std::vector<std::array<glm::vec3, 3>> logoTriangles = logoUBB.GetTriangles(logoModelMatrix);
-    MeshSDF solidCells = MeshBoundary::Voxelize(logoTriangles, SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
+    try
+    {
+        logoSnowfall.BuildInitialPositions();
+        logoSnowfall.BuildParticleBlocks();
 
-    constexpr float sledScale = 1.5f;
-    constexpr float sledCenterX = 2.1f;
-    constexpr float sledInitialZ = 0.5f;
-    constexpr float sledEndZ = 4.5f;
-    constexpr float sledSpeed = 3.0f;
-    float sledCenterZ = sledInitialZ;
-    float sledAccumulatedZ = 0.0f;
+        snowSledLayer.BuildInitialPositions();
+        snowSledLayer.BuildParticleBlocks();
 
-    // 180° Y rotation so runner nose faces +Z (direction of travel); scale baked in once
-    const glm::mat4 sledLocalMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(sledScale)) * glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    const glm::mat4 sledStartMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledInitialZ)) * sledLocalMatrix;
-    MeshSDF initialSledSDF = MeshBoundary::Voxelize(sledModel.GetTriangles(sledStartMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
+        snowfall.BuildInitialPositions();
+        snowfall.BuildParticleBlocks();
+    }
+    catch (const MPMException& exception)
+    {
+        return Program::ReportErrorAndTerminate(exception);
+    }
 
-    Particle particles1(snowfall.initialPositions);
-    Simulation sim1(snowfall.particleCount, snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), particles1.GetVBO());
-    sim1.UploadMeshBoundary(solidCells);
+    const glm::mat4 logoModelMatrix = LogoSnowfall::GetLogoModelMatrix();
+    MeshSDF logoSDF = MeshBoundary::Voxelize(logoUBB.GetTriangles(logoModelMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
 
-    Particle particles2(snowLayer.initialPositions);
-    Simulation sim2(snowLayer.particleCount, snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()), particles2.GetVBO());
-    sim2.UploadMeshBoundary(initialSledSDF);
+    const glm::mat4 sledModelMatrix = SnowSled::GetSledModelMatrix();
+    MeshSDF sledSDF = MeshBoundary::Voxelize(sled.GetTriangles(sledModelMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
 
-    Simulation* activeSim = &sim1;
-    Particle* activeParticles = &particles1;
+    Particle logoSnowfallParticles(logoSnowfall.GetInitialPositions());
+    Particle snowSledLayerParticles(snowSledLayer.GetInitialPositions());
+    Particle snowfallParticles(snowfall.GetInitialPositions());
 
-    camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 7.5f), -90.0f, 0.0f);
+    Simulation logoSnowfallSimulation(logoSnowfall, logoSnowfallParticles.GetVBO());
+    Simulation snowSledLayerSimulation(snowSledLayer, snowSledLayerParticles.GetVBO());
+    Simulation snowfallSimulation(snowfall, snowfallParticles.GetVBO());
 
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_PROGRAM_POINT_SIZE);
-    glClearColor(0.04f, 0.07f, 0.15f, 1.0f);
+    logoSnowfallSimulation.UploadMeshBoundary(logoSDF);
+    snowSledLayerSimulation.UploadMeshBoundary(sledSDF);
 
-    ShellTexture shellTexture(ASSETS_PATH "/crystal_color.png", ASSETS_PATH "/crystal_specular.png", 8);
+    camera.SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
 
-    constexpr float particleShellRadius = 0.018f;
-    constexpr float shellInnerFraction = 0.85f;
-
-    int activeScene = 1;
-
-    int recordingScene = 1;
-    std::optional<VideoRecorder> recorder;
+    std::unique_ptr<VideoRecorder> recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
 
     if (Program::recordingMode)
     {
-        recorder.emplace(Program::currentWidth, Program::currentHeight, Program::recordingOutputPathScene1);
+        try
+        {
+            recorder->Open(Program::logoSceneOutputPath);
+        }
+        catch (const MPMException& exception)
+        {
+            return Program::ReportErrorAndTerminate(exception);
+        }
     }
+
+    Simulation* activeSimulation = &logoSnowfallSimulation;
+    Particle* activeParticles = &logoSnowfallParticles;
+
+    std::array<Simulation*, 3> simulations = { &logoSnowfallSimulation, &snowSledLayerSimulation, &snowfallSimulation };
+    std::array<Particle*, 3> particles = { &logoSnowfallParticles, &snowSledLayerParticles, &snowfallParticles };
+    std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
+    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, nullptr };
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+
+    glm::vec4 backgroundColor(0.04f, 0.07f, 0.15f, 1.0f);
+
+    glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
 
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
-
-        if (program.IsKeyJustPressed(GLFW_KEY_1))
-        {
-            activeScene = 1;
-            activeSim = &sim1;
-            activeParticles = &particles1;
-            SimulationConfig::SwitchScenesParameters(1);
-            activeSim->UpdatePhysicsParams();
-            activeSim->SetBoundaryVelocity(glm::vec3(0.0f));
-            activeSim->UploadMeshBoundary(solidCells);
-            activeSim->Reset(snowfall.initialBlocks.data(), static_cast<int>(snowfall.initialBlocks.size()), snowfall.particleCount);
-            activeParticles->SetCount(snowfall.particleCount);
-            camera.SetInitialOrientation(glm::vec3(2.56f, 1.5f, 7.5f), -90.0f, 0.0f);
-        }
-
-        if (program.IsKeyJustPressed(GLFW_KEY_2))
-        {
-            activeScene = 2;
-            activeSim = &sim2;
-            activeParticles = &particles2;
-            SimulationConfig::SwitchScenesParameters(2);
-            activeSim->UpdatePhysicsParams();
-            activeSim->UploadMeshBoundary(initialSledSDF);
-            activeSim->Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()), snowLayer.particleCount);
-            activeParticles->SetCount(snowLayer.particleCount);
-            sledCenterZ = sledInitialZ;
-            sledAccumulatedZ = 0.0f;
-            camera.SetInitialOrientation(glm::vec3(-0.400f, 2.218f, 3.051f), -0.40f, -35.00f);
-        }
-
-        if (program.IsKeyJustPressed(GLFW_KEY_SPACE))
-        {
-            program.SwitchPause();
-        }
+        program.ProcessInput(activeSimulation, activeParticles, simulations, boundarySDFs, particles, snowVolumes);
 
         camera.UpdateSpeed(program.deltaTime);
-
-        program.ProcessInput();
         camera.ProcessInput();
+
+        activeSimulation->SyncPositionsToVBO();
 
         if (!program.IsPaused())
         {
             for (int step = 0; step < SimulationConfig::simulationSubsteps; step++)
             {
-                if (activeScene == 2)
+                if (program.GetActiveScene() == 2)
                 {
-                    const bool sledMoving = sledCenterZ < sledEndZ;
-                    activeSim->SetBoundaryVelocity(sledMoving ? glm::vec3(0.0f, 0.0f, sledSpeed) : glm::vec3(0.0f));
-
-                    if (sledMoving)
-                    {
-                        sledCenterZ += sledSpeed * SimulationConfig::physicsTimeStep;
-                        sledAccumulatedZ += sledSpeed * SimulationConfig::physicsTimeStep;
-
-                        if (sledAccumulatedZ >= SimulationConfig::cellSize)
-                        {
-                            const int shiftCells = static_cast<int>(sledAccumulatedZ / SimulationConfig::cellSize);
-                            activeSim->ShiftSdfZ(shiftCells);
-                            sledAccumulatedZ -= static_cast<float>(shiftCells) * SimulationConfig::cellSize;
-                        }
-                    }
+                    SnowSled::Move(activeSimulation);
                 }
 
-                activeSim->Step();
+                activeSimulation->Step();
             }
-
-            activeSim->SyncPositionsToVBO();
         }
 
-        if (recorder)
+        if (Program::recordingMode)
         {
             recorder->BeginFrame();
         }
@@ -229,63 +185,49 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         sceneShader.Use();
-        sceneShader.SetMat4("view", camera.GetViewMatrix());
-        sceneShader.SetMat4("projection", camera.GetProjectionMatrix());
-        sceneShader.SetVec3("viewPosition", camera.GetPosition());
+        program.SetSceneUniforms(sceneShader);
 
-        const float gridSize = SimulationConfig::cellCountPerAxis * SimulationConfig::cellSize;
-        sceneShader.SetMat4("model", glm::scale(glm::mat4(1.0f), glm::vec3(gridSize, 1.0f, gridSize)));
-        sceneShader.SetMat3("normalMatrix", glm::mat3(1.0f));
-        sceneShader.SetVec3("objectColor", glm::vec3(0.12f, 0.18f, 0.28f));
+        Program::SetFloorUniforms(sceneShader);
         floorModel.Draw(sceneShader);
 
-        if (activeScene == 1)
+        if (program.GetActiveScene() == 1)
         {
-            sceneShader.SetMat4("model", logoModelMatrix);
-            sceneShader.SetMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(logoModelMatrix))));
-            sceneShader.SetVec3("objectColor", glm::vec3(1.0f, 1.0f, 1.0f));
-
+            LogoSnowfall::SetLogoUniforms(sceneShader, logoModelMatrix);
             logoUBB.Draw(sceneShader);
         }
 
-        if (activeScene == 2)
+        if (program.GetActiveScene() == 2)
         {
-            const glm::mat4 sledMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledCenterZ)) * sledLocalMatrix;
-            sceneShader.SetMat4("model", sledMatrix);
-            sceneShader.SetMat3("normalMatrix", glm::mat3(glm::transpose(glm::inverse(sledMatrix))));
-            sledModel.Draw(sceneShader);
+            SnowSled::SetLogoUniforms(sceneShader, sledModelMatrix);
+            sled.Draw(sceneShader);
+        }
+
+        if (program.GetActiveScene() == 3)
+        {
+
         }
 
         shellShader.Use();
-
-        const glm::mat4 viewMatrix = camera.GetViewMatrix();
-        const glm::mat4 projMatrix = camera.GetProjectionMatrix();
-        const glm::vec3 lightDirEye = glm::normalize(glm::vec3(viewMatrix * glm::vec4(glm::vec3(-0.2f, -1.0f, -0.3f), 0.0f)));
-
-        shellShader.SetMat4("view", viewMatrix);
-        shellShader.SetMat4("projection", projMatrix);
-        shellShader.SetFloat("viewportHeight", static_cast<float>(Program::currentHeight));
-        shellShader.SetVec3("lightDirEye", lightDirEye);
+        ShellTexture::SetShellCameraUniforms(shellShader, camera);
 
         shellTexture.Bind(shellShader);
+        shellTexture.DrawParticles(shellShader, *activeParticles);
 
-        for (int shell = shellTexture.shellCount - 1; shell >= 0; shell--)
-        {
-            const float t = static_cast<float>(shell) / static_cast<float>(shellTexture.shellCount - 1);
-            const float shellFraction = shellInnerFraction + (1.0f - shellInnerFraction) * t;
-            shellShader.SetFloat("sphereRadius", particleShellRadius * shellFraction);
-            shellShader.SetInt("currentShell", shell);
-            activeParticles->Draw(shellShader);
-        }
-
-        if (!recorder)
+        if (!Program::recordingMode)
         {
             glfwSwapBuffers(program.window);
             glfwPollEvents();
             continue;
         }
 
-        recorder->EndFrame();
+        try
+        {
+            recorder->EndFrame();
+        }
+        catch (const MPMException& exception)
+        {
+            return Program::ReportErrorAndTerminate(exception);
+        }
 
         if (!recorder->IsDone())
         {
@@ -293,24 +235,24 @@ int main()
             continue;
         }
 
-        if (recordingScene == 1)
+        if (program.GetRecordingScene() == 1)
         {
-            recordingScene = 2;
-            activeScene = 2;
-            activeSim = &sim2;
-            activeParticles = &particles2;
+            program.SetRecordingScene(2);
+            program.ChangeScene(program.GetRecordingScene(), *simulations[1], *boundarySDFs[1], *particles[1], *snowVolumes[1]);
 
-            SimulationConfig::SwitchScenesParameters(2);
-            activeSim->UpdatePhysicsParams();
-            camera.SetInitialOrientation(glm::vec3(-0.400f, 2.218f, 3.051f), -0.40f, -35.00f);
+            SnowSled::sledCenterZ = SnowSled::sledInitialZ;
+            SnowSled::sledAccumulatedZ = 0.0f;
 
-            activeSim->UploadMeshBoundary(initialSledSDF);
-            activeSim->Reset(snowLayer.initialBlocks.data(), static_cast<int>(snowLayer.initialBlocks.size()), snowLayer.particleCount);
-            activeParticles->SetCount(snowLayer.particleCount);
+            recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
 
-            sledCenterZ = sledInitialZ;
-            sledAccumulatedZ = 0.0f;
-            recorder.emplace(Program::currentWidth, Program::currentHeight, Program::recordingOutputPathScene2);
+            try
+            {
+                recorder->Open(Program::sledSceneOutputPath);
+            }
+            catch (const MPMException& exception)
+            {
+                return Program::ReportErrorAndTerminate(exception);
+            }
         }
         else
         {
@@ -319,15 +261,4 @@ int main()
     }
 
     return 0;
-}
-
-void SetSceneLighting(const Shader& sceneShader)
-{
-    sceneShader.Use();
-
-    sceneShader.SetVec3("directionalLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
-    sceneShader.SetVec3("directionalLight.ambient", glm::vec3(0.5f, 0.5f, 0.5f));
-    sceneShader.SetVec3("directionalLight.diffuse", glm::vec3(0.8f, 0.8f, 0.8f));
-    sceneShader.SetVec3("directionalLight.specular", glm::vec3(1.0f, 1.0f, 1.0f));
-    sceneShader.SetFloat("material.shininess", 32.0f);
 }

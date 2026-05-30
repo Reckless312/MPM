@@ -17,6 +17,7 @@ enum class Error
     BlocksMemoryAllocation = 12,
     ModelMemoryAllocation = 13,
     WrongPlatform = 14,
+    RecordingPipeFailure = 15,
 };
 
 #endif

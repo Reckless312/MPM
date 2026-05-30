@@ -1,7 +1,5 @@
 #include "WritePositionsKernel.h"
 
-#include <cuda_runtime.h>
-
 __global__ void WritePositionsKernel(const ParticleBlock* particleBlocks, float* buffer, const int particleCount)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);

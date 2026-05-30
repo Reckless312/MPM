@@ -14,21 +14,21 @@ class Model
 public:
     explicit Model(const std::string &path);
 
+    [[nodiscard]] std::vector<std::vector<glm::vec3>> GetTriangles(const glm::mat4& modelMatrix) const;
+
     void loadModel();
     void Draw(const Shader &shader) const;
-
-    [[nodiscard]] std::vector<std::array<glm::vec3, 3>> GetTriangles(const glm::mat4& modelMatrix) const;
 private:
-    std::string modelPath;
-    std::string directory;
-
     std::vector<Mesh> meshes;
     std::vector<Texture> loadedTextures;
 
-    void processMesh(aiMesh *mesh, const aiScene *scene);
-    void processNode(const aiNode *node, const aiScene *scene);
+    std::string modelPath;
+    std::string directory;
 
     std::vector<Texture> loadMaterialTextures(const aiMaterial *material, aiTextureType type, const std::string &typeName);
+
+    void processMesh(aiMesh *mesh, const aiScene *scene);
+    void processNode(const aiNode *node, const aiScene *scene);
 };
 
 

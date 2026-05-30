@@ -1,7 +1,7 @@
 #include "RebuildMapping.h"
+
 #include "../Structures/Morton.h"
-#include "../SimParameters.h"
-#include <cuda_runtime.h>
+#include "CUDA/SimulationParameters.h"
 
 __global__ void RebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint32_t* nextBlockIndex, uint64_t* blockCodes)
 {

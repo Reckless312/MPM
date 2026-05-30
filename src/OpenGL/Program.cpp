@@ -4,7 +4,8 @@
 
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
-#include "SimulationConfig.h"
+#include "Scene/SnowSled.h"
+#include "Simulation/SimulationConfig.h"
 
 Program::Program()
 {
@@ -14,11 +15,6 @@ Program::Program()
 Program::~Program()
 {
     glfwTerminate();
-}
-
-void Program::SwitchPause()
-{
-    this->paused = !this->paused;
 }
 
 void Program::InitializeGLFW()
@@ -86,6 +82,27 @@ void Program::SetViewportAndResizeCallback() const
     glfwSetFramebufferSizeCallback(this->window, Program::ResizeWindow);
 }
 
+void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume)
+{
+    simulation.UnregisterVBO();
+
+    this->activeScene = scene;
+
+    SimulationConfig::SwitchScenesParameters(this->activeScene);
+
+    constexpr glm::vec3 nullifyVelocity = glm::vec3(0.0f);
+
+    simulation.UpdatePhysicsParams();
+    simulation.UploadMeshBoundary(boundarySDF);
+    simulation.SetBoundaryVelocity(nullifyVelocity);
+    particles.ResizeVBO(snowVolume.GetParticleCount());
+    simulation.Reset(snowVolume);
+
+    simulation.RebindVBO(particles.GetVBO());
+
+    Camera::ChangeOrientationOnScene(this->window, this->activeScene);
+}
+
 bool Program::IsKeyJustPressed(const int key)
 {
     const bool current = glfwGetKey(this->window, key) == GLFW_PRESS;
@@ -100,6 +117,47 @@ bool Program::IsPaused() const
     return this->paused;
 }
 
+void Program::SetActiveScene(const int scene)
+{
+    this->activeScene = scene;
+}
+
+void Program::SetRecordingScene(const int scene)
+{
+    this->recordingScene = scene;
+}
+
+void Program::SetSceneUniforms(const Shader& shader) const
+{
+    if (const auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(this->window)))
+    {
+        shader.SetMat4("view", camera->GetViewMatrix());
+        shader.SetMat4("projection", camera->GetProjectionMatrix());
+        shader.SetVec3("viewPosition", camera->GetPosition());
+    }
+}
+
+void Program::SetFloorUniforms(const Shader &shader)
+{
+    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(SimulationConfig::gridSize, 1.0f, SimulationConfig::gridSize));
+    const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
+
+    constexpr glm::vec3 objectColor = glm::vec3(0.12f, 0.18f, 0.28f);
+
+    shader.SetMat4("model", model);
+    shader.SetMat3("normalMatrix", normal);
+    shader.SetVec3("objectColor", objectColor);
+}
+
+int Program::GetActiveScene() const
+{
+    return this->activeScene;
+}
+
+int Program::GetRecordingScene() const
+{
+    return this->recordingScene;
+}
 
 void Program::ResizeWindow(GLFWwindow *window, const int width, const int height)
 {
@@ -120,11 +178,40 @@ int Program::ReportErrorAndTerminate(const MPMException &exception)
     return static_cast<int>(exception.GetErrorType());
 }
 
-void Program::ProcessInput() const
+void Program::ProcessInput(Simulation*& activeSimulation, Particle*& activeParticles, const std::array<Simulation*, 3> &simulations, const std::array<const MeshSDF*, 3> &boundarySDFs, const std::array<Particle*, 3> &particles, const std::array<const SnowVolume*, 3> &snowVolumes)
 {
     if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(this->window, true);
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_SPACE))
+    {
+        this->paused = !this->paused;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_1))
+    {
+        this->ChangeScene(1, *simulations[0], *boundarySDFs[0], *particles[0], *snowVolumes[0]);
+        activeSimulation = simulations[0];
+        activeParticles = particles[0];
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_2))
+    {
+        this->ChangeScene(2, *simulations[1], *boundarySDFs[1], *particles[1], *snowVolumes[1]);
+        activeSimulation = simulations[1];
+        activeParticles = particles[1];
+
+        SnowSled::sledCenterZ = SnowSled::sledInitialZ;
+        SnowSled::sledAccumulatedZ = 0.0f;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_3))
+    {
+        this->ChangeScene(3, *simulations[2], *boundarySDFs[2], *particles[2], *snowVolumes[2]);
+        activeSimulation = simulations[2];
+        activeParticles = particles[2];
     }
 }
 

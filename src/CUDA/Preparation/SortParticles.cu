@@ -1,10 +1,22 @@
 #include "SortParticles.h"
+
 #include "RebuildMapping.h"
 #include "../Structures/Morton.h"
-#include "../SimParameters.h"
+#include "../SimulationParameters.h"
 #include "../CudaCheck.h"
-#include <cuda_runtime.h>
 #include <cub/cub.cuh>
+
+__global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
+{
+    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+
+    if (particleIndex >= particleCount)
+    {
+        return;
+    }
+
+    indices[particleIndex] = static_cast<uint32_t>(particleIndex);
+}
 
 __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys)
 {
@@ -39,7 +51,7 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
     const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
-    if (blockIndex == UINT32_MAX)
+    if (blockIndex == BLOCK_NOT_FOUND)
     {
         sortKeys[particleIndex] = UINT64_MAX;
         return;
@@ -52,54 +64,6 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
 
     sortKeys[particleIndex] = (static_cast<uint64_t>(blockIndex) << cellBits) | cellCode;
-}
-
-__global__ void ReorderParticlesKernel(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const uint32_t* sortedIndices, const int particleCount)
-{
-    const int newIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (newIndex >= particleCount)
-    {
-        return;
-    }
-
-    const int oldIndex = static_cast<int>(sortedIndices[newIndex]);
-
-    const int oldParticleBlockIndex = oldIndex / 32;
-    const int oldParticleLane = oldIndex % 32;
-
-    const int newParticleBlockIndex = newIndex / 32;
-    const int newParticleLane = newIndex % 32;
-
-    outputBlocks[newParticleBlockIndex].positionX[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionX[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].positionY[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionY[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].positionZ[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionZ[oldParticleLane];
-
-    outputBlocks[newParticleBlockIndex].velocityX[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityX[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].velocityY[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityY[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].velocityZ[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityZ[oldParticleLane];
-
-    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
-    {
-        outputBlocks[newParticleBlockIndex].deformationGradient[componentIndex][newParticleLane] = inputBlocks[oldParticleBlockIndex].deformationGradient[componentIndex][oldParticleLane];
-        outputBlocks[newParticleBlockIndex].affineMomentumMatrix[componentIndex][newParticleLane] = inputBlocks[oldParticleBlockIndex].affineMomentumMatrix[componentIndex][oldParticleLane];
-    }
-
-    outputBlocks[newParticleBlockIndex].mass[newParticleLane] = inputBlocks[oldParticleBlockIndex].mass[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].volume[newParticleLane] = inputBlocks[oldParticleBlockIndex].volume[oldParticleLane];
-    outputBlocks[newParticleBlockIndex].plasticVolume[newParticleLane] = inputBlocks[oldParticleBlockIndex].plasticVolume[oldParticleLane];
-}
-
-__global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
-{
-    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (particleIndex >= particleCount)
-    {
-        return;
-    }
-
-    indices[particleIndex] = static_cast<uint32_t>(particleIndex);
 }
 
 __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes)
@@ -136,9 +100,9 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
         // ReSharper disable once CppTooWideScopeInitStatement
         const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
-        if (blockIndex == UINT32_MAX)
+        if (blockIndex == BLOCK_NOT_FOUND)
         {
-            key = UINT32_MAX;
+            key = BLOCK_NOT_FOUND;
         }
         else
         {
@@ -153,7 +117,7 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     }
     else
     {
-        key = UINT32_MAX;
+        key = BLOCK_NOT_FOUND;
     }
 
     auto sourceLane = static_cast<uint32_t>(lane);
@@ -191,6 +155,7 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
+
     const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
     const float velocityY = particleBlocks[particleBlockIndex].velocityY[lane];
     const float velocityZ = particleBlocks[particleBlockIndex].velocityZ[lane];
@@ -216,6 +181,7 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleBlocks[particleBlockIndex].positionX[lane] = __shfl_sync(0xFFFFFFFF, positionX, static_cast<int>(sourceLane));
     particleBlocks[particleBlockIndex].positionY[lane] = __shfl_sync(0xFFFFFFFF, positionY, static_cast<int>(sourceLane));
     particleBlocks[particleBlockIndex].positionZ[lane] = __shfl_sync(0xFFFFFFFF, positionZ, static_cast<int>(sourceLane));
+
     particleBlocks[particleBlockIndex].velocityX[lane] = __shfl_sync(0xFFFFFFFF, velocityX, static_cast<int>(sourceLane));
     particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(0xFFFFFFFF, velocityY, static_cast<int>(sourceLane));
     particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(0xFFFFFFFF, velocityZ, static_cast<int>(sourceLane));
@@ -235,25 +201,38 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 
-void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes, const cudaStream_t stream)
+__global__ void ReorderParticlesKernel(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const uint32_t* sortedIndices, const int particleCount)
 {
-    const int particleBlockCount = (particleCount + 31) / 32;
-    WarpSortKernel<<<particleBlockCount, 32, 0, stream>>>(particleBlocks, particleCount, blockCodeToIndex, particleHomeBlockCodes);
-}
+    const int newIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
-void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes, const cudaStream_t stream)
-{
-    constexpr int threadsPerBlock = 256;
-    const int threadBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
+    if (newIndex >= particleCount)
+    {
+        return;
+    }
 
-    InitIndicesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(indices, particleCount);
-    CUDA_CHECK(cudaGetLastError());
+    const int oldIndex = static_cast<int>(sortedIndices[newIndex]);
 
-    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys);
-    CUDA_CHECK(cudaGetLastError());
+    const int oldParticleBlockIndex = oldIndex / 32;
+    const int oldParticleLane = oldIndex % 32;
 
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount, 0, sizeof(uint64_t) * 8, stream));
+    const int newParticleBlockIndex = newIndex / 32;
+    const int newParticleLane = newIndex % 32;
 
-    ReorderParticlesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, outputBlocks, sortedIndices, particleCount);
-    CUDA_CHECK(cudaGetLastError());
+    outputBlocks[newParticleBlockIndex].positionX[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionX[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].positionY[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionY[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].positionZ[newParticleLane] = inputBlocks[oldParticleBlockIndex].positionZ[oldParticleLane];
+
+    outputBlocks[newParticleBlockIndex].velocityX[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityX[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].velocityY[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityY[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].velocityZ[newParticleLane] = inputBlocks[oldParticleBlockIndex].velocityZ[oldParticleLane];
+
+    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
+    {
+        outputBlocks[newParticleBlockIndex].deformationGradient[componentIndex][newParticleLane] = inputBlocks[oldParticleBlockIndex].deformationGradient[componentIndex][oldParticleLane];
+        outputBlocks[newParticleBlockIndex].affineMomentumMatrix[componentIndex][newParticleLane] = inputBlocks[oldParticleBlockIndex].affineMomentumMatrix[componentIndex][oldParticleLane];
+    }
+
+    outputBlocks[newParticleBlockIndex].mass[newParticleLane] = inputBlocks[oldParticleBlockIndex].mass[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].volume[newParticleLane] = inputBlocks[oldParticleBlockIndex].volume[oldParticleLane];
+    outputBlocks[newParticleBlockIndex].plasticVolume[newParticleLane] = inputBlocks[oldParticleBlockIndex].plasticVolume[oldParticleLane];
 }

@@ -1,11 +1,9 @@
 #include "G2P.h"
 
-
 #include "P2G.h"
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
-#include "../SimParameters.h"
-#include <cuda_runtime.h>
+#include "../SimulationParameters.h"
 #include <svd3/svd3_cuda.h>
 
 __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const uint64_t* particleHomeBlockCodes, uint32_t* rebuildFlag)
@@ -94,7 +92,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
                 const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
-                if (blockIndex == UINT32_MAX)
+                if (blockIndex == BLOCK_NOT_FOUND)
                 {
                     continue;
                 }

@@ -1,6 +1,9 @@
+#include "Camera.h"
+
 #include <glm/gtc/quaternion.hpp>
 
-#include "Camera.h"
+#include "LogoSnowfall.h"
+#include "SnowSled.h"
 #include "Exceptions/MPMException.h"
 
 Camera::Camera(GLFWwindow* window)
@@ -22,45 +25,6 @@ Camera::Camera(GLFWwindow* window)
     this->UpdateProjectionMatrix();
 }
 
-void Camera::UpdateRightVector()
-{
-    this->right = glm::normalize(glm::cross(this->front, this->up));
-}
-
-void Camera::UpdateViewMatrix()
-{
-    this->viewMatrix = glm::lookAt(this->position, this->position + this->front, this->up);
-}
-
-void Camera::UpdateProjectionMatrix()
-{
-    int framebufferWidth, framebufferHeight;
-    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
-
-    const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
-    this->projectionMatrix = glm::perspective(glm::radians(this->fov), aspectRatio, this->nearPlane, this->farPlane);
-}
-
-void Camera::UpdateSpeed(const float deltaTime)
-{
-    this->speed = this->speedMultiplier * deltaTime;
-}
-
-void Camera::SetInitialOrientation(const glm::vec3 desiredPosition, const float desiredYaw, const float desiredPitch)
-{
-    this->position = desiredPosition;
-    this->yaw = desiredYaw;
-    this->pitch = desiredPitch;
-
-    this->UpdateDirection();
-}
-
-glm::vec3 Camera::GetPosition() const
-{
-    return this->position;
-}
-
-
 glm::mat4 Camera::GetViewMatrix() const
 {
     return this->viewMatrix;
@@ -71,16 +35,53 @@ glm::mat4 Camera::GetProjectionMatrix() const
     return this->projectionMatrix;
 }
 
-void Camera::UpdateDirection()
+glm::vec3 Camera::GetPosition() const
 {
-    this->direction.x = static_cast<float>(cos(glm::radians(yaw)) * cos(glm::radians(pitch)));
-    this->direction.z = static_cast<float>(sin(glm::radians(yaw)) * cos(glm::radians(pitch)));
-    this->direction.y = static_cast<float>(sin(glm::radians(pitch)));
+    return this->position;
+}
 
-    this->front = glm::normalize(this->direction);
+void Camera::ScrollCallback(GLFWwindow *window, double xOffset, const double yOffset)
+{
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
+    {
+        camera->UpdateFov(static_cast<float>(yOffset));
+        camera->UpdateProjectionMatrix();
+    }
+    else
+    {
+        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
+    }
+}
 
-    this->UpdateRightVector();
-    this->UpdateViewMatrix();
+void Camera::MouseCallback(GLFWwindow *window, const double xPosition, const double yPosition)
+{
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
+    {
+        camera->UpdateMousePosition(static_cast<float>(xPosition), static_cast<float>(yPosition));
+    }
+    else
+    {
+        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
+    }
+}
+
+void Camera::ChangeOrientationOnScene(GLFWwindow *window, const int scene)
+{
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
+    {
+        if (scene == 1)
+        {
+            camera->SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
+        }
+        else if (scene == 2)
+        {
+            camera->SetInitialOrientation(SnowSled::cameraPosition, SnowSled::cameraYaw, SnowSled::cameraPitch);
+        }
+    }
+    else
+    {
+        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
+    }
 }
 
 void Camera::ProcessInput()
@@ -107,6 +108,89 @@ void Camera::ProcessInput()
     }
 }
 
+void Camera::UpdateProjectionMatrix()
+{
+    int framebufferWidth, framebufferHeight;
+    glfwGetFramebufferSize(this->window, &framebufferWidth, &framebufferHeight);
+
+    const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+    this->projectionMatrix = glm::perspective(glm::radians(this->fov), aspectRatio, this->nearPlane, this->farPlane);
+}
+
+void Camera::UpdateSpeed(const float deltaTime)
+{
+    this->speed = this->speedMultiplier * deltaTime;
+}
+
+void Camera::AssignUserPointerAndSetCallbacks()
+{
+    glfwSetWindowUserPointer(this->window, this);
+
+    glfwSetCursorPosCallback(this->window, Camera::MouseCallback);
+    glfwSetScrollCallback(this->window, Camera::ScrollCallback);
+}
+
+void Camera::SetInitialOrientation(const glm::vec3 desiredPosition, const float desiredYaw, const float desiredPitch)
+{
+    this->position = desiredPosition;
+    this->yaw = desiredYaw;
+    this->pitch = desiredPitch;
+
+    this->UpdateDirection();
+}
+
+void Camera::UpdateDirection()
+{
+    this->direction.x = static_cast<float>(cos(glm::radians(yaw)) * cos(glm::radians(pitch)));
+    this->direction.z = static_cast<float>(sin(glm::radians(yaw)) * cos(glm::radians(pitch)));
+    this->direction.y = static_cast<float>(sin(glm::radians(pitch)));
+
+    this->front = glm::normalize(this->direction);
+
+    this->UpdateRightVector();
+    this->UpdateViewMatrix();
+}
+
+void Camera::UpdateViewMatrix()
+{
+    this->viewMatrix = glm::lookAt(this->position, this->position + this->front, this->up);
+}
+
+void Camera::UpdateRightVector()
+{
+    this->right = glm::normalize(glm::cross(this->front, this->up));
+}
+
+void Camera::UpdateFov(const float yOffset)
+{
+    this->fov -= yOffset;
+
+    if (fov < this->minFov)
+    {
+        fov = this->minFov;
+    }
+
+    if (fov > this->maxFov)
+    {
+        fov = this->maxFov;
+    }
+}
+
+void Camera::UpdatePitch(const float yDirectionOffset)
+{
+    this->pitch += yDirectionOffset;
+
+    if (this->pitch > this->maxPitch)
+    {
+        this->pitch = this->maxPitch;
+    }
+
+    if (this->pitch < this->minPitch)
+    {
+        this->pitch = this->minPitch;
+    }
+}
+
 void Camera::UpdateMousePosition(const float currentXDirection, const float currentYDirection)
 {
     if (this->firstMouse)
@@ -129,67 +213,4 @@ void Camera::UpdateMousePosition(const float currentXDirection, const float curr
 
     this->UpdatePitch(-yDirectionOffset);
     this->UpdateDirection();
-}
-
-void Camera::AssignUserPointerAndSetCallbacks()
-{
-    glfwSetWindowUserPointer(this->window, this);
-
-    glfwSetCursorPosCallback(this->window, Camera::MouseCallback);
-    glfwSetScrollCallback(this->window, Camera::ScrollCallback);
-}
-
-void Camera::MouseCallback(GLFWwindow *window, const double xPosition, const double yPosition)
-{
-    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
-    {
-        camera->UpdateMousePosition(static_cast<float>(xPosition), static_cast<float>(yPosition));
-    }
-    else
-    {
-        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
-    }
-}
-
-void Camera::ScrollCallback(GLFWwindow *window, double xOffset, const double yOffset)
-{
-    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
-    {
-        camera->UpdateFov(static_cast<float>(yOffset));
-        camera->UpdateProjectionMatrix();
-    }
-    else
-    {
-        throw MPMException("Failed to get GLFW window user pointer.", Error::GLFWLoadUserPointer);
-    }
-}
-
-void Camera::UpdatePitch(const float yDirectionOffset)
-{
-    this->pitch += yDirectionOffset;
-
-    if (this->pitch > this->maxPitch)
-    {
-        this->pitch = this->maxPitch;
-    }
-
-    if (this->pitch < this->minPitch)
-    {
-        this->pitch = this->minPitch;
-    }
-}
-
-void Camera::UpdateFov(const float yOffset)
-{
-    this->fov -= yOffset;
-
-    if (fov < this->minFov)
-    {
-        fov = this->minFov;
-    }
-
-    if (fov > this->maxFov)
-    {
-        fov = this->maxFov;
-    }
 }

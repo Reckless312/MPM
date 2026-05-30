@@ -1,57 +1,76 @@
 #version 330 core
 
-in vec3 eyeSpacePos;
+in vec3 viewSpacePosition;
 
-uniform mat4 projection;
-uniform float sphereRadius;
-uniform vec3 lightDirEye;
 uniform sampler2DArray shellColorTextures;
 uniform sampler2DArray shellSpecularTextures;
+
+uniform mat4 projection;
+uniform vec3 lightDirectionView;
+
+uniform float sphereRadius;
+
 uniform int currentShell;
 uniform int totalShells;
 
 out vec4 FragmentColor;
 
-const float pi = 3.14159265358979;
-const float alphaThreshold = 0.5;
-const float ambientStrength = 0.4;
-const float glitterShininess = 16.0;
-const float glitterStrength = 0.2;
-
-const vec3 shadowColor = vec3(0.45, 0.60, 0.80);
-const vec3 litColor = vec3(1.0, 1.0, 1.0);
-
 void main()
 {
-    vec3 N;
-    N.xy = gl_PointCoord * 2.0 - 1.0;
-    float r2 = dot(N.xy, N.xy);
-    if (r2 > 1.0) discard;
-    N.z = -sqrt(1.0 - r2);
+    vec3 sphereNormal;
+    sphereNormal.xy = gl_PointCoord * 2.0 - 1.0;
 
-    vec4 pixelPos = vec4(eyeSpacePos + N * sphereRadius, 1.0);
-    vec4 clipSpacePos = projection * pixelPos;
-    gl_FragDepth = clipSpacePos.z / clipSpacePos.w * 0.5 + 0.5;
+    float squaredDistance = dot(sphereNormal.xy, sphereNormal.xy);
 
-    float u = fract(atan(N.y, N.x) / (2.0 * pi));
-    float v = acos(-N.z) / pi;
-    vec3 texCoord = vec3(u, v, float(currentShell));
+    if (squaredDistance > 1.0)
+    {
+        discard;
+    }
 
-    vec4 crystalSample = texture(shellColorTextures, texCoord);
-    if (crystalSample.a < alphaThreshold) discard;
+    sphereNormal.z = -sqrt(1.0 - squaredDistance);
 
-    float diffuse = max(0.0, dot(N, lightDirEye));
-    float light = ambientStrength + (1.0 - ambientStrength) * diffuse;
-    float depthFactor = 0.85 + 0.15 * float(currentShell) / float(totalShells - 1);
+    vec4 pixelPosition = vec4(viewSpacePosition + sphereNormal * sphereRadius, 1.0);
+    vec4 clipSpacePosition = projection * pixelPosition;
 
-    vec3 encodedNormal = texture(shellSpecularTextures, texCoord).xyz;
-    vec3 randomNormal = normalize(encodedNormal * 2.0 - 1.0);
-    vec3 viewDir = normalize(-eyeSpacePos);
-    vec3 reflectDir = reflect(-lightDirEye, randomNormal);
-    float glitter = pow(max(0.0, dot(reflectDir, viewDir)), glitterShininess);
+    gl_FragDepth = clipSpacePosition.z / clipSpacePosition.w * 0.5 + 0.5;
 
-    vec3 result = mix(shadowColor, litColor, light) * depthFactor
-                + vec3(glitter * glitterStrength);
+    const float pi = acos(-1.0);
+
+    float longitude = fract(atan(sphereNormal.y, sphereNormal.x) / (2.0 * pi));
+    float latitude = acos(-sphereNormal.z) / pi;
+
+    vec3 textureCoordinates = vec3(longitude, latitude, float(currentShell));
+
+    vec4 crystalSample = texture(shellColorTextures, textureCoordinates);
+    const float alphaThreshold = 0.5;
+
+    if (crystalSample.a < alphaThreshold)
+    {
+        discard;
+    }
+
+    float diffuse = max(0.0, dot(sphereNormal, lightDirectionView));
+
+    const float ambientStrength = 0.4;
+    float lightIntensity = ambientStrength + (1.0 - ambientStrength) * diffuse;
+
+    const float shellDepthMin = 0.85;
+    const float shellDepthRange = 0.15;
+    float depthFactor = shellDepthMin + shellDepthRange * float(currentShell) / float(totalShells - 1);
+
+    vec3 encodedNormal = texture(shellSpecularTextures, textureCoordinates).xyz;
+    vec3 crystalNormal = normalize(encodedNormal * 2.0 - 1.0);
+
+    vec3 viewDirection = normalize(-viewSpacePosition);
+    vec3 reflectDirection = reflect(-lightDirectionView, crystalNormal);
+
+    const float glitterShininess = 16.0;
+    const float glitterStrength = 0.2;
+    float glitterIntensity = pow(max(0.0, dot(reflectDirection, viewDirection)), glitterShininess);
+
+    const vec3 snowShadowColor = vec3(0.45, 0.60, 0.80);
+    const vec3 snowLitColor = vec3(1.0, 1.0, 1.0);
+    vec3 result = mix(snowShadowColor, snowLitColor, lightIntensity) * depthFactor + vec3(glitterIntensity * glitterStrength);
 
     FragmentColor = vec4(result, 1.0);
 }

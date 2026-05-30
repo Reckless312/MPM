@@ -1,17 +1,12 @@
 #include "UpdateGrid.h"
+
 #include "../Structures/Morton.h"
 #include "../Preparation/RebuildMapping.h"
-#include "../SimParameters.h"
+#include "../SimulationParameters.h"
 
 __global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const float* sdfDistances, const glm::vec3* sdfNormals)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (nodeIndex >= simulationParameters.maxBlocks * nodesPerBlock)
-    {
-        return;
-    }
-
     const int gridBlockIndex = nodeIndex / nodesPerBlock;
     const int nodeLane = nodeIndex % nodesPerBlock;
 
@@ -42,80 +37,47 @@ __global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCod
 
     const float tangentialScale = 1.0f - simulationParameters.boundaryFriction;
 
-    if (nodeGridX < 2 && velocityX < 0.0f)
+    EnforceWallBoundary(velocityX, velocityY, velocityZ, nodeGridX, simulationParameters.gridSizeInCells, tangentialScale);
+    if (nodeGridY < 2 || nodeGridY >= simulationParameters.gridSizeInCells - 2)
     {
-        velocityX = 0.0f;
         velocityY *= tangentialScale;
-        velocityZ *= tangentialScale;
+        EnforceWallBoundary(velocityY, velocityX, velocityZ, nodeGridY, simulationParameters.gridSizeInCells, tangentialScale);
     }
-    else if (nodeGridX >= simulationParameters.gridSizeInCells - 2 && velocityX > 0.0f)
-    {
-        velocityX = 0.0f;
-        velocityY *= tangentialScale;
-        velocityZ *= tangentialScale;
-    }
+    EnforceWallBoundary(velocityZ, velocityX, velocityY, nodeGridZ, simulationParameters.gridSizeInCells, tangentialScale);
 
-    if (nodeGridY < 2)
-    {
-        if (velocityY < 0.0f)
-        {
-            velocityX *= tangentialScale;
-            velocityZ *= tangentialScale;
-            velocityY = 0.0f;
-        }
-        else
-        {
-            velocityY *= tangentialScale;
-        }
-    }
-    else if (nodeGridY >= simulationParameters.gridSizeInCells - 2)
-    {
-        if (velocityY > 0.0f)
-        {
-            velocityX *= tangentialScale;
-            velocityZ *= tangentialScale;
-            velocityY = 0.0f;
-        }
-        else
-        {
-            velocityY *= tangentialScale;
-        }
-    }
-
-    if (nodeGridZ < 2 && velocityZ < 0.0f)
-    {
-        velocityZ = 0.0f;
-        velocityX *= tangentialScale;
-        velocityY *= tangentialScale;
-    }
-    else if (nodeGridZ >= simulationParameters.gridSizeInCells - 2 && velocityZ > 0.0f)
-    {
-        velocityZ = 0.0f;
-        velocityX *= tangentialScale;
-        velocityY *= tangentialScale;
-    }
-
+    // ReSharper disable once CppTooWideScopeInitStatement
     const int sdfIndex = nodeGridZ * simulationParameters.gridSizeInCells * simulationParameters.gridSizeInCells + nodeGridY * simulationParameters.gridSizeInCells + nodeGridX;
 
     if (sdfDistances[sdfIndex] < simulationParameters.cellSize)
     {
         const glm::vec3 normal = sdfNormals[sdfIndex];
-        const float relNormal = (velocityX - simulationParameters.boundaryVelocity.x) * normal.x + (velocityY - simulationParameters.boundaryVelocity.y) * normal.y + (velocityZ - simulationParameters.boundaryVelocity.z) * normal.z;
+        // ReSharper disable once CppTooWideScopeInitStatement
+        const float relativeNormal = (velocityX - simulationParameters.boundaryVelocity.x) * normal.x + (velocityY - simulationParameters.boundaryVelocity.y) * normal.y + (velocityZ - simulationParameters.boundaryVelocity.z) * normal.z;
 
-        if (relNormal < 0.0f)
+        if (relativeNormal < 0.0f)
         {
-            velocityX -= relNormal * normal.x;
-            velocityY -= relNormal * normal.y;
-            velocityZ -= relNormal * normal.z;
+            velocityX -= relativeNormal * normal.x;
+            velocityY -= relativeNormal * normal.y;
+            velocityZ -= relativeNormal * normal.z;
 
-            const float velDotNormal = velocityX * normal.x + velocityY * normal.y + velocityZ * normal.z;
-            velocityX = velDotNormal * normal.x + tangentialScale * (velocityX - velDotNormal * normal.x);
-            velocityY = velDotNormal * normal.y + tangentialScale * (velocityY - velDotNormal * normal.y);
-            velocityZ = velDotNormal * normal.z + tangentialScale * (velocityZ - velDotNormal * normal.z);
+            const float normalVelocityComponent = velocityX * normal.x + velocityY * normal.y + velocityZ * normal.z;
+            velocityX = normalVelocityComponent * normal.x + tangentialScale * (velocityX - normalVelocityComponent * normal.x);
+            velocityY = normalVelocityComponent * normal.y + tangentialScale * (velocityY - normalVelocityComponent * normal.y);
+            velocityZ = normalVelocityComponent * normal.z + tangentialScale * (velocityZ - normalVelocityComponent * normal.z);
         }
     }
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;
     gridBlocks[gridBlockIndex].velocityY[nodeLane] = velocityY;
     gridBlocks[gridBlockIndex].velocityZ[nodeLane] = velocityZ;
+}
+
+__device__ void EnforceWallBoundary(float& normalVelocity, float& tangentialVelocityA, float& tangentialVelocityB, const int nodeCoordinate, const int gridSizeInCells, const float tangentialScale)
+{
+    if ((nodeCoordinate < 2 && normalVelocity < 0.0f) || (nodeCoordinate >= gridSizeInCells - 2 && normalVelocity > 0.0f))
+    {
+        normalVelocity = 0.0f;
+        tangentialVelocityA *= tangentialScale;
+        tangentialVelocityB *= tangentialScale;
+    }
 }

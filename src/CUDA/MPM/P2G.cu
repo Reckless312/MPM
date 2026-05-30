@@ -1,47 +1,11 @@
 #include "P2G.h"
 
-
 #include "../Preparation/RebuildMapping.h"
 #include "../Structures/Morton.h"
-#include "../SimParameters.h"
-#include <cuda_runtime.h>
+#include "../SimulationParameters.h"
 #include <svd3/svd3_cuda.h>
 
-__device__ uint64_t ComputeParticleBlockCode(const float positionX, const float positionY, const float positionZ, const float cellSize)
-{
-    const float inverseCellSize = 1.0f / cellSize;
-
-    const float gridPositionX = positionX * inverseCellSize;
-    const float gridPositionY = positionY * inverseCellSize;
-    const float gridPositionZ = positionZ * inverseCellSize;
-
-    const int cellX = static_cast<int>(floorf(gridPositionX - freeZoneShift));
-    const int cellY = static_cast<int>(floorf(gridPositionY - freeZoneShift));
-    const int cellZ = static_cast<int>(floorf(gridPositionZ - freeZoneShift));
-
-    const int blockX = cellX / blockSize;
-    const int blockY = cellY / blockSize;
-    const int blockZ = cellZ / blockSize;
-
-    return MortonEncode(blockX, blockY, blockZ);
-}
-
-__device__ void ComputeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
-{
-    weightsX[0] = 0.5f * (1.5f - fractionalX) * (1.5f - fractionalX);
-    weightsX[1] = 0.75f - (fractionalX - 1.0f) * (fractionalX - 1.0f);
-    weightsX[2] = 0.5f * (fractionalX - 0.5f) * (fractionalX - 0.5f);
-
-    weightsY[0] = 0.5f * (1.5f - fractionalY) * (1.5f - fractionalY);
-    weightsY[1] = 0.75f - (fractionalY - 1.0f) * (fractionalY - 1.0f);
-    weightsY[2] = 0.5f * (fractionalY - 0.5f) * (fractionalY - 0.5f);
-
-    weightsZ[0] = 0.5f * (1.5f - fractionalZ) * (1.5f - fractionalZ);
-    weightsZ[1] = 0.75f - (fractionalZ - 1.0f) * (fractionalZ - 1.0f);
-    weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
-}
-
-__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -56,11 +20,6 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
-
-    if (shouldRecordHomeBlocks)
-    {
-        particleHomeBlockCodes[particleIndex] = ComputeParticleBlockCode(positionX, positionY, positionZ, simulationParameters.cellSize);
-    }
 
     const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
     const float velocityY = particleBlocks[particleBlockIndex].velocityY[lane];
@@ -207,7 +166,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
                 const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
-                if (blockIndex == UINT32_MAX)
+                if (blockIndex == BLOCK_NOT_FOUND)
                 {
                     continue;
                 }
@@ -225,4 +184,19 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
             }
         }
     }
+}
+
+__device__ void ComputeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
+{
+    weightsX[0] = 0.5f * (1.5f - fractionalX) * (1.5f - fractionalX);
+    weightsX[1] = 0.75f - (fractionalX - 1.0f) * (fractionalX - 1.0f);
+    weightsX[2] = 0.5f * (fractionalX - 0.5f) * (fractionalX - 0.5f);
+
+    weightsY[0] = 0.5f * (1.5f - fractionalY) * (1.5f - fractionalY);
+    weightsY[1] = 0.75f - (fractionalY - 1.0f) * (fractionalY - 1.0f);
+    weightsY[2] = 0.5f * (fractionalY - 0.5f) * (fractionalY - 0.5f);
+
+    weightsZ[0] = 0.5f * (1.5f - fractionalZ) * (1.5f - fractionalZ);
+    weightsZ[1] = 0.75f - (fractionalZ - 1.0f) * (fractionalZ - 1.0f);
+    weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }
