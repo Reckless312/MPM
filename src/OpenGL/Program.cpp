@@ -111,6 +111,7 @@ void Program::UpdateDeltaTime()
 
     this->deltaTime = currentFrame - this->lastFrame;
     this->lastFrame = currentFrame;
+
 }
 
 void Program::LockCursor() const

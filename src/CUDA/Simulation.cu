@@ -64,6 +64,7 @@ Simulation::Simulation(const SnowVolume& snowVolume, const unsigned int vbo)
         SimulationConfig::boundaryFriction,
         SimulationConfig::cellCountPerAxis,
         SimulationConfig::maxBlocks,
+        static_cast<int>(log2(nodesPerBlock)),
         glm::vec3(0.0f)
     };
 

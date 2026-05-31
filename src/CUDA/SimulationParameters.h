@@ -15,6 +15,7 @@ struct SimulationParameters
     float boundaryFriction;
     int gridSizeInCells;
     int maxBlocks;
+    int cellBits;
     glm::vec3 boundaryVelocity;
 };
 

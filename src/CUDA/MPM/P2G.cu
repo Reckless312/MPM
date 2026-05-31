@@ -175,7 +175,7 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const auto localY = static_cast<uint32_t>(nodeY % blockSize);
                 const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
 
-                const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
+                const uint32_t nodeLane = localX + localY * blockSize + localZ * blockSize * blockSize;
 
                 atomicAdd(&gridBlocks[blockIndex].mass[nodeLane], weight * mass);
                 atomicAdd(&gridBlocks[blockIndex].velocityX[nodeLane], momentumX * weight);

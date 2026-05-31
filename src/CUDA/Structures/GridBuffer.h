@@ -1,9 +1,11 @@
 #ifndef MPM_METHOD_GRID_BUFFER_H
 #define MPM_METHOD_GRID_BUFFER_H
 
+#include "../Preparation/RebuildMapping.h"
+
 struct GridBlock {
-    float mass[512];
-    float velocityX[512], velocityY[512], velocityZ[512];
+    float mass[nodesPerBlock];
+    float velocityX[nodesPerBlock], velocityY[nodesPerBlock], velocityZ[nodesPerBlock];
 };
 
 #endif

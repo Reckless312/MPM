@@ -61,9 +61,9 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const auto localY = static_cast<uint32_t>(cellY % blockSize);
     const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
 
-    const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
+    const uint32_t cellCode = localX + localY * blockSize + localZ * blockSize * blockSize;
 
-    sortKeys[particleIndex] = (static_cast<uint64_t>(blockIndex) << cellBits) | cellCode;
+    sortKeys[particleIndex] = (static_cast<uint64_t>(blockIndex) << simulationParameters.cellBits) | cellCode;
 }
 
 __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes)
@@ -110,9 +110,9 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
             const auto localY = static_cast<uint32_t>(cellY % blockSize);
             const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
 
-            const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
+            const uint32_t cellCode = localX + localY * blockSize + localZ * blockSize * blockSize;
 
-            key = (blockIndex << cellBits) | cellCode;
+            key = (blockIndex << simulationParameters.cellBits) | cellCode;
         }
     }
     else

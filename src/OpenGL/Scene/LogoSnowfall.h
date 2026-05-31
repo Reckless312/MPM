@@ -14,7 +14,7 @@ namespace LogoSnowfall
     inline constexpr float cameraPitch = 0.0f;
     inline constexpr float snowDensity = 400.0f;
 
-    inline constexpr int particleCount = 60000;
+    inline constexpr int particleCount = 100000;
 
     inline glm::mat4 GetLogoModelMatrix()
     {

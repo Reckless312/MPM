@@ -101,7 +101,7 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
                 const auto localY = static_cast<uint32_t>(nodeY % blockSize);
                 const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
 
-                const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
+                const uint32_t nodeLane = localX + localY * blockSize + localZ * blockSize * blockSize;
 
                 const float gridVelocityX = gridBlocks[blockIndex].velocityX[nodeLane];
                 const float gridVelocityY = gridBlocks[blockIndex].velocityY[nodeLane];

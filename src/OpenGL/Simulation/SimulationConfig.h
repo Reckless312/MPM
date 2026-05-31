@@ -14,7 +14,7 @@ namespace SimulationConfig
     inline constexpr float cellSize = 0.02f;
     inline constexpr float gridSize = cellCountPerAxis * cellSize;
 
-    inline static float physicsTimeStep = 3.8e-4f;
+    inline static float physicsTimeStep = 3.5e-4f;
     //inline static float physicsTimeStep = 1e-4f;
 
     inline float firstLameParameter = 3.889e4f;
@@ -24,7 +24,7 @@ namespace SimulationConfig
     inline float criticalStretch = 0.0075f;
     inline float boundaryFriction = 0.8f;
     
-    inline int defaultSimulationSubsteps = 9;
+    inline int defaultSimulationSubsteps = 6;
     inline int simulationSubsteps = Program::recordingMode ? static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * SimulationConfig::physicsTimeStep))) : defaultSimulationSubsteps;
 
     inline void UpdateParameters(const float newFirstLameParameter, const float newSecondLameParameter, const float newHardeningCoefficient, const float newCriticalCompression, const float newCriticalStretch)
@@ -44,7 +44,7 @@ namespace SimulationConfig
                 SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f);
                 break;
             case 2:
-                SimulationConfig::UpdateParameters(1.333e4f, 2.0e4f, 5.0f, 0.025f, 0.0075f);
+                SimulationConfig::UpdateParameters(1.5e4f, 2.5e4f, 3.0f, 0.025f, 0.0075f);
                 break;
             case 3:
                 SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f);

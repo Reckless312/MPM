@@ -23,19 +23,20 @@ namespace SnowSled
     inline constexpr float sledEndZ = boxRightCorner.z + zMargin;
     inline constexpr float sledInitialZ = boxLeftCorner.z - zMargin;
 
-    inline constexpr int particleCount = 60000;
+    inline constexpr int particleCount = 100000;
+    inline const glm::mat4 sledLocalMatrix = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f));
 
     inline float sledAccumulatedZ = 0.0f;
     inline float sledCenterZ = sledInitialZ;
 
     inline glm::mat4 GetSledModelMatrix()
     {
-        return glm::translate(glm::mat4(1.0f), glm::vec3(2.1f, 0.04f, sledCenterZ));
+        return glm::translate(glm::mat4(1.0f), glm::vec3(2.1f, 0.04f, sledCenterZ)) * sledLocalMatrix;
     }
 
     inline void SetLogoUniforms(const Shader &shader)
     {
-        const glm::mat4 sledMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledCenterZ));
+        const glm::mat4 sledMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(sledCenterX, 0.04f, sledCenterZ)) * sledLocalMatrix;
         const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(sledMatrix)));
 
         shader.SetMat4("model", sledMatrix);

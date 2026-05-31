@@ -5,7 +5,6 @@
 #include "../Structures/ParticleBuffer.h"
 #include "../Structures/HashTable.h"
 
-constexpr int cellBits = 9;
 
 #ifdef __CUDACC__
 __global__ void InitIndicesKernel(uint32_t* indices, int particleCount);
