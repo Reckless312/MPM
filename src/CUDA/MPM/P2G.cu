@@ -130,6 +130,8 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     sharedWeights[7 * weightStride + threadOffset] = weightsZ[1];
     sharedWeights[8 * weightStride + threadOffset] = weightsZ[2];
 
+    const unsigned int warpMask = __activemask();
+
     for (int neighborX = 0; neighborX < 3; neighborX++)
     {
         for (int neighborY = 0; neighborY < 3; neighborY++)
@@ -140,9 +142,28 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
-                if (nodeX < 0 || nodeY < 0 || nodeZ < 0)
+                uint32_t blockIndex = BLOCK_NOT_FOUND;
+                uint32_t nodeLane = 0;
+
+                if (nodeX >= 0 && nodeY >= 0 && nodeZ >= 0)
                 {
-                    continue;
+                    const int nodeBlockX = nodeX / blockSize;
+                    const int nodeBlockY = nodeY / blockSize;
+                    const int nodeBlockZ = nodeZ / blockSize;
+
+                    const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
+                    blockIndex = Lookup(blockCodeToIndex, blockCode);
+                }
+
+                const bool valid = blockIndex != BLOCK_NOT_FOUND;
+
+                if (valid)
+                {
+                    const auto localX = static_cast<uint32_t>(nodeX % blockSize);
+                    const auto localY = static_cast<uint32_t>(nodeY % blockSize);
+                    const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
+
+                    nodeLane = localX + localY * blockSize + localZ * blockSize * blockSize;
                 }
 
                 const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
@@ -159,28 +180,54 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const float momentumY = mass * (velocityY + affineMomentumMatrix[3] * particleToNodeOffsetX + affineMomentumMatrix[4] * particleToNodeOffsetY + affineMomentumMatrix[5] * particleToNodeOffsetZ) + stressScale * stressForceY;
                 const float momentumZ = mass * (velocityZ + affineMomentumMatrix[6] * particleToNodeOffsetX + affineMomentumMatrix[7] * particleToNodeOffsetY + affineMomentumMatrix[8] * particleToNodeOffsetZ) + stressScale * stressForceZ;
 
-                const int nodeBlockX = nodeX / blockSize;
-                const int nodeBlockY = nodeY / blockSize;
-                const int nodeBlockZ = nodeZ / blockSize;
+                float weightedMass = 0.0f, weightedMomentumX = 0.0f, weightedMomentumY = 0.0f, weightedMomentumZ = 0.0f;
+                uint32_t key = 0xFFFFFFFFu;
 
-                const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
-
-                if (blockIndex == BLOCK_NOT_FOUND)
+                if (valid)
                 {
-                    continue;
+                    key = ((blockIndex << 9) | nodeLane);
+
+                    weightedMass = mass * weight;
+
+                    weightedMomentumX = momentumX * weight;
+                    weightedMomentumY = momentumY * weight;
+                    weightedMomentumZ = momentumZ * weight;
                 }
 
-                const auto localX = static_cast<uint32_t>(nodeX % blockSize);
-                const auto localY = static_cast<uint32_t>(nodeY % blockSize);
-                const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
+                const unsigned int match = __match_any_sync(warpMask, key);
 
-                const uint32_t nodeLane = localX + localY * blockSize + localZ * blockSize * blockSize;
+                for (int reductionOffset = 16; reductionOffset > 0; reductionOffset >>= 1)
+                {
+                    const float peerMass = __shfl_down_sync(warpMask, weightedMass, reductionOffset);
 
-                atomicAdd(&gridBlocks[blockIndex].mass[nodeLane], weight * mass);
-                atomicAdd(&gridBlocks[blockIndex].velocityX[nodeLane], momentumX * weight);
-                atomicAdd(&gridBlocks[blockIndex].velocityY[nodeLane], momentumY * weight);
-                atomicAdd(&gridBlocks[blockIndex].velocityZ[nodeLane], momentumZ * weight);
+                    const float peerMomentumX = __shfl_down_sync(warpMask, weightedMomentumX, reductionOffset);
+                    const float peerMomentumY = __shfl_down_sync(warpMask, weightedMomentumY, reductionOffset);
+                    const float peerMomentumZ = __shfl_down_sync(warpMask, weightedMomentumZ, reductionOffset);
+
+                    const int peer = lane + reductionOffset;
+                    // ReSharper disable once CppTooWideScopeInitStatement
+                    const bool validPeer = peer < 32;
+
+                    if (validPeer && ((match >> static_cast<unsigned int>(peer)) & 1u))
+                    {
+                        weightedMass += peerMass;
+                        weightedMomentumX += peerMomentumX;
+                        weightedMomentumY += peerMomentumY;
+                        weightedMomentumZ += peerMomentumZ;
+                    }
+                }
+
+
+                // ReSharper disable once CppTooWideScopeInitStatement
+                int updatingLane = __ffs(static_cast<int>(match)) - 1;
+
+                if (valid && lane == updatingLane)
+                {
+                    atomicAdd(&gridBlocks[blockIndex].mass[nodeLane], weightedMass);
+                    atomicAdd(&gridBlocks[blockIndex].velocityX[nodeLane], weightedMomentumX);
+                    atomicAdd(&gridBlocks[blockIndex].velocityY[nodeLane], weightedMomentumY);
+                    atomicAdd(&gridBlocks[blockIndex].velocityZ[nodeLane], weightedMomentumZ);
+                }
             }
         }
     }
