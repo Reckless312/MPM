@@ -1,10 +1,10 @@
-#include "ComputeHomeBlocks.h"
+#include "RegisterParticlesHomeBlocks.h"
 
-#include "RebuildMapping.h"
+#include "RegisterActiveBlocks.h"
 #include "../Structures/Morton.h"
 #include "../SimulationParameters.h"
 
-__global__ void ComputeHomeBlocksKernel(const ParticleBlock* particleBlocks, const int particleCount, uint64_t* particleHomeBlockCodes)
+__global__ void RegisterParticlesHomeBlocks(const ParticleBlock* particleBlocks, const int particleCount, uint64_t* particleHomeBlockCodes)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 

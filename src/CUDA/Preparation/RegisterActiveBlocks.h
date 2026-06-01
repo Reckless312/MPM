@@ -11,7 +11,7 @@ constexpr int blockSize = 8;
 constexpr int nodesPerBlock = blockSize * blockSize * blockSize;
 
 #ifdef __CUDACC__
-__global__ void RebuildMappingKernel(const ParticleBlock* particleBlocks, int particleCount, const HashTable& blockCodeToIndex, uint32_t* nextBlockIndex, uint64_t* blockCodes);
+__global__ void RegisterActiveBlocks(const ParticleBlock* particleBlocks, int particleCount, const HashTable& blockCodeToIndex, uint32_t* nextBlockIndex, uint64_t* blockCodes);
 #endif
 
 #endif

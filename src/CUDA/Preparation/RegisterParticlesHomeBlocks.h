@@ -4,7 +4,7 @@
 #include <cstdint>
 #include "../Structures/ParticleBuffer.h"
 #ifdef __CUDACC__
-__global__ void ComputeHomeBlocksKernel(const ParticleBlock* particleBlocks, int particleCount, uint64_t* particleHomeBlockCodes);
+__global__ void RegisterParticlesHomeBlocks(const ParticleBlock* particleBlocks, int particleCount, uint64_t* particleHomeBlockCodes);
 #endif
 
 #endif

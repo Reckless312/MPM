@@ -1,6 +1,6 @@
 #include "SortParticles.h"
 
-#include "RebuildMapping.h"
+#include "RegisterActiveBlocks.h"
 #include "../Structures/Morton.h"
 #include "../SimulationParameters.h"
 #include "../CudaCheck.h"

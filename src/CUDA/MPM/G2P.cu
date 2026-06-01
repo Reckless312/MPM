@@ -1,7 +1,7 @@
 #include "G2P.h"
 
 #include "P2G.h"
-#include "../Preparation/RebuildMapping.h"
+#include "../Preparation/RegisterActiveBlocks.h"
 #include "../Structures/Morton.h"
 #include "../SimulationParameters.h"
 #include <svd3/svd3_cuda.h>

@@ -11,8 +11,8 @@
 #include "MPM/P2G.h"
 #include "MPM/UpdateGrid.h"
 #include "OpenGL/Simulation/SimulationConfig.h"
-#include "Preparation/ComputeHomeBlocks.h"
-#include "Preparation/RebuildMapping.h"
+#include "Preparation/RegisterParticlesHomeBlocks.h"
+#include "Preparation/RegisterActiveBlocks.h"
 #include "Preparation/SortParticles.h"
 
 
@@ -114,7 +114,7 @@ void Simulation::Step()
         CUDA_CHECK(cudaMemsetAsync(this->blockCodeToIndex.keys, 0xFF, SimulationConfig::maxBlocks * sizeof(uint64_t), this->simulationStream));
         CUDA_CHECK(cudaMemsetAsync(this->nextBlockIndex, 0, sizeof(uint32_t), this->simulationStream));
 
-        RebuildMappingKernel<<<launchBlocks, this->threadsPerBlock, 0, this->simulationStream>>>(this->particleBlocks, this->particleCount, this->blockCodeToIndex, this->nextBlockIndex, this->blockCodes);
+        RegisterActiveBlocks<<<launchBlocks, this->threadsPerBlock, 0, this->simulationStream>>>(this->particleBlocks, this->particleCount, this->blockCodeToIndex, this->nextBlockIndex, this->blockCodes);
         CUDA_CHECK(cudaGetLastError());
 
         this->SortParticles();
@@ -329,7 +329,7 @@ void Simulation::DestroyGraphIfValid()
 void Simulation::ComputeHomeBlocks() const
 {
     const int launchBlocks = this->ParticleLaunchBlocks();
-    ComputeHomeBlocksKernel<<<launchBlocks, this->threadsPerBlock, 0, this->simulationStream>>>(this->particleBlocks, this->particleCount, this->particleHomeBlockCodes);
+    RegisterParticlesHomeBlocks<<<launchBlocks, this->threadsPerBlock, 0, this->simulationStream>>>(this->particleBlocks, this->particleCount, this->particleHomeBlockCodes);
 }
 
 void Simulation::FreeParticleBuffers() const

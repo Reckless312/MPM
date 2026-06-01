@@ -29,12 +29,12 @@ set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
         src/CUDA/Structures/ParticleBuffer.h
         src/CUDA/Structures/Morton.h
         src/CUDA/Structures/Morton.cu
-        src/CUDA/Preparation/RebuildMapping.h
-        src/CUDA/Preparation/RebuildMapping.cu
+        src/CUDA/Preparation/RegisterActiveBlocks.h
+        src/CUDA/Preparation/RegisterActiveBlocks.cu
         src/CUDA/Preparation/SortParticles.h
         src/CUDA/Preparation/SortParticles.cu
-        src/CUDA/Preparation/ComputeHomeBlocks.h
-        src/CUDA/Preparation/ComputeHomeBlocks.cu
+        src/CUDA/Preparation/RegisterParticlesHomeBlocks.h
+        src/CUDA/Preparation/RegisterParticlesHomeBlocks.cu
         src/CUDA/MPM/P2G.h
         src/CUDA/MPM/P2G.cu
         src/CUDA/MPM/UpdateGrid.h

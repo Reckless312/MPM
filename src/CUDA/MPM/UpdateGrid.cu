@@ -1,7 +1,7 @@
 #include "UpdateGrid.h"
 
 #include "../Structures/Morton.h"
-#include "../Preparation/RebuildMapping.h"
+#include "../Preparation/RegisterActiveBlocks.h"
 #include "../SimulationParameters.h"
 
 __global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const float* sdfDistances, const glm::vec3* sdfNormals)
