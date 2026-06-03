@@ -1,4 +1,4 @@
-#include "SnowLayer.h"
+#include "SnowVolume.h"
 
 #include <cstring>
 #include <random>
@@ -6,9 +6,32 @@
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
 
-void SnowLayer::BuildInitialPositions()
+SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner, const int particleCount, const float snowDensity)
 {
-    const glm::vec3 boxDiagonal = upperRightBoxCorner - lowerLeftBoxCorner;
+    this->lowerLeftBoxCorner = lowerLeftBoxCorner;
+    this->upperRightBoxCorner = upperRightBoxCorner;
+    this->particleCount = particleCount;
+    this->snowDensity = snowDensity;
+}
+
+std::vector<glm::vec3> SnowVolume::GetInitialPositions() const
+{
+    return this->initialPositions;
+}
+
+std::vector<ParticleBlock> SnowVolume::GetInitialBlocks() const
+{
+    return this->initialBlocks;
+}
+
+int SnowVolume::GetParticleCount() const
+{
+    return this->particleCount;
+}
+
+void SnowVolume::BuildInitialPositions()
+{
+    const glm::vec3 boxDiagonal = this->upperRightBoxCorner - this->lowerLeftBoxCorner;
     const float boxVolume = boxDiagonal.x * boxDiagonal.y * boxDiagonal.z;
 
     this->particleVolume = boxVolume / static_cast<float>(this->particleCount);
@@ -17,9 +40,9 @@ void SnowLayer::BuildInitialPositions()
     std::random_device randomDevice;
     std::mt19937 randomEngine(randomDevice());
 
-    std::uniform_real_distribution distributionX(lowerLeftBoxCorner.x, upperRightBoxCorner.x);
-    std::uniform_real_distribution distributionY(lowerLeftBoxCorner.y, upperRightBoxCorner.y);
-    std::uniform_real_distribution distributionZ(lowerLeftBoxCorner.z, upperRightBoxCorner.z);
+    std::uniform_real_distribution distributionX(this->lowerLeftBoxCorner.x, this->upperRightBoxCorner.x);
+    std::uniform_real_distribution distributionY(this->lowerLeftBoxCorner.y, this->upperRightBoxCorner.y);
+    std::uniform_real_distribution distributionZ(this->lowerLeftBoxCorner.z, this->upperRightBoxCorner.z);
 
     try
     {
@@ -32,11 +55,11 @@ void SnowLayer::BuildInitialPositions()
 
     for (int particle = 0; particle < this->particleCount; particle++)
     {
-        initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
+        this->initialPositions.emplace_back(distributionX(randomEngine), distributionY(randomEngine), distributionZ(randomEngine));
     }
 }
 
-void SnowLayer::BuildParticleBlocks()
+void SnowVolume::BuildParticleBlocks()
 {
     const int blockCount = (this->particleCount + 31) / 32;
 

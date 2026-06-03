@@ -1,8 +1,9 @@
-#include "RebuildMapping.h"
-#include "../Structures/Morton.h"
-#include <cuda_runtime.h>
+#include "RegisterActiveBlocks.h"
 
-__global__ void RebuildMappingKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable &blockCodeToIndex, uint32_t* nextBlockIndex, uint64_t* blockCodes, const float cellSize)
+#include "../Structures/Morton.h"
+#include "CUDA/SimulationParameters.h"
+
+__global__ void RegisterActiveBlocks(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint32_t* nextBlockIndex, uint64_t* blockCodes)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -18,7 +19,7 @@ __global__ void RebuildMappingKernel(const ParticleBlock* particleBlocks, const 
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;

@@ -1,18 +1,14 @@
 #include "UpdateGrid.h"
-#include "../Structures/Morton.h"
-#include "../Preparation/RebuildMapping.h"
 
-__global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCodes, const int totalBlocks, const float deltaTime, const float gravity, const int gridSizeInCells, const float boundaryFriction, const float cellSize, const float* sdfDistances, const glm::vec3* sdfNormals, const glm::vec3* boundaryVelocity)
+#include "../Structures/Morton.h"
+#include "../Preparation/RegisterActiveBlocks.h"
+#include "../SimulationParameters.h"
+
+__global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCodes, const float* sdfDistances, const glm::vec3* sdfNormals)
 {
     const int nodeIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (nodeIndex >= totalBlocks * nodesPerBlock)
-    {
-        return;
-    }
-
-    const int gridBlockIndex = nodeIndex / nodesPerBlock;
-    const int nodeLane = nodeIndex % nodesPerBlock;
+    const int gridBlockIndex = nodeIndex / NODES_PER_BLOCK;
+    const int nodeLane = nodeIndex % NODES_PER_BLOCK;
 
     const float nodeMass = gridBlocks[gridBlockIndex].mass[nodeLane];
 
@@ -36,84 +32,52 @@ __global__ void UpdateGridKernel(GridBlock *gridBlocks, const uint64_t *blockCod
     float velocityY = gridBlocks[gridBlockIndex].velocityY[nodeLane] / nodeMass;
     float velocityZ = gridBlocks[gridBlockIndex].velocityZ[nodeLane] / nodeMass;
 
-    velocityY -= gravity * deltaTime;
+    constexpr float gravity = 9.8f;
+    velocityY -= gravity * simulationParameters.deltaTime;
 
-    const float tangentialScale = 1.0f - boundaryFriction;
+    const float tangentialScale = 1.0f - simulationParameters.boundaryFriction;
 
-    if (nodeGridX < 2 && velocityX < 0.0f)
-    {
-        velocityX = 0.0f;
-        velocityY *= tangentialScale;
-        velocityZ *= tangentialScale;
-    }
-    else if (nodeGridX >= gridSizeInCells - 2 && velocityX > 0.0f)
-    {
-        velocityX = 0.0f;
-        velocityY *= tangentialScale;
-        velocityZ *= tangentialScale;
-    }
+    EnforceWallBoundary(velocityX, velocityY, velocityZ, nodeGridX, simulationParameters.gridSizeInCells, tangentialScale);
+    EnforceWallBoundary(velocityY, velocityX, velocityZ, nodeGridY, simulationParameters.gridSizeInCells, tangentialScale);
+    EnforceWallBoundary(velocityZ, velocityX, velocityY, nodeGridZ, simulationParameters.gridSizeInCells, tangentialScale);
 
-    if (nodeGridY < 2)
-    {
-        if (velocityY < 0.0f)
-        {
-            velocityX *= tangentialScale;
-            velocityZ *= tangentialScale;
-            velocityY = 0.0f;
-        }
-        else
-        {
-            velocityY *= tangentialScale;
-        }
-    }
-    else if (nodeGridY >= gridSizeInCells - 2)
-    {
-        if (velocityY > 0.0f)
-        {
-            velocityX *= tangentialScale;
-            velocityZ *= tangentialScale;
-            velocityY = 0.0f;
-        }
-        else
-        {
-            velocityY *= tangentialScale;
-        }
-    }
+    // ReSharper disable once CppTooWideScopeInitStatement
+    const int sdfIndex = nodeGridZ * simulationParameters.gridSizeInCells * simulationParameters.gridSizeInCells + nodeGridY * simulationParameters.gridSizeInCells + nodeGridX;
 
-    if (nodeGridZ < 2 && velocityZ < 0.0f)
-    {
-        velocityZ = 0.0f;
-        velocityX *= tangentialScale;
-        velocityY *= tangentialScale;
-    }
-    else if (nodeGridZ >= gridSizeInCells - 2 && velocityZ > 0.0f)
-    {
-        velocityZ = 0.0f;
-        velocityX *= tangentialScale;
-        velocityY *= tangentialScale;
-    }
-
-    const int sdfIndex = nodeGridZ * gridSizeInCells * gridSizeInCells + nodeGridY * gridSizeInCells + nodeGridX;
-
-    if (sdfDistances[sdfIndex] < cellSize)
+    if (sdfDistances[sdfIndex] < simulationParameters.cellSize)
     {
         const glm::vec3 normal = sdfNormals[sdfIndex];
-        const float relNormal = (velocityX - boundaryVelocity->x) * normal.x + (velocityY - boundaryVelocity->y) * normal.y + (velocityZ - boundaryVelocity->z) * normal.z;
 
-        if (relNormal < 0.0f)
+        const float relativeVelocityX = velocityX - simulationParameters.boundaryVelocity.x;
+        const float relativeVelocityY = velocityY - simulationParameters.boundaryVelocity.y;
+        const float relativeVelocityZ = velocityZ - simulationParameters.boundaryVelocity.z;
+
+        // ReSharper disable once CppTooWideScopeInitStatement
+        const float relativeNormal = relativeVelocityX * normal.x + relativeVelocityY * normal.y + relativeVelocityZ * normal.z;
+
+        if (relativeNormal < 0.0f)
         {
-            velocityX -= relNormal * normal.x;
-            velocityY -= relNormal * normal.y;
-            velocityZ -= relNormal * normal.z;
+            const float tangentialVelocityX = (relativeVelocityX - relativeNormal * normal.x) * tangentialScale;
+            const float tangentialVelocityY = (relativeVelocityY - relativeNormal * normal.y) * tangentialScale;
+            const float tangentialVelocityZ = (relativeVelocityZ - relativeNormal * normal.z) * tangentialScale;
 
-            const float velDotNormal = velocityX * normal.x + velocityY * normal.y + velocityZ * normal.z;
-            velocityX = velDotNormal * normal.x + tangentialScale * (velocityX - velDotNormal * normal.x);
-            velocityY = velDotNormal * normal.y + tangentialScale * (velocityY - velDotNormal * normal.y);
-            velocityZ = velDotNormal * normal.z + tangentialScale * (velocityZ - velDotNormal * normal.z);
+            velocityX = tangentialVelocityX + simulationParameters.boundaryVelocity.x;
+            velocityY = tangentialVelocityY + simulationParameters.boundaryVelocity.y;
+            velocityZ = tangentialVelocityZ + simulationParameters.boundaryVelocity.z;
         }
     }
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;
     gridBlocks[gridBlockIndex].velocityY[nodeLane] = velocityY;
     gridBlocks[gridBlockIndex].velocityZ[nodeLane] = velocityZ;
+}
+
+__device__ void EnforceWallBoundary(float& normalVelocity, float& tangentialVelocityA, float& tangentialVelocityB, const int nodeCoordinate, const int gridSizeInCells, const float tangentialScale)
+{
+    if ((nodeCoordinate < 2 && normalVelocity < 0.0f) || (nodeCoordinate >= gridSizeInCells - 2 && normalVelocity > 0.0f))
+    {
+        normalVelocity = 0.0f;
+        tangentialVelocityA *= tangentialScale;
+        tangentialVelocityB *= tangentialScale;
+    }
 }

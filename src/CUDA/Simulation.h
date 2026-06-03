@@ -3,76 +3,82 @@
 
 #include <cstddef>
 #include <vector>
-
 #include <glm/vec3.hpp>
-
-#include "Structures/ParticleBuffer.h"
+#include <cuda_runtime.h>
+#include "SimulationParameters.h"
+#include "OpenGL/Simulation/MeshBoundary.h"
+#include "OpenGL/Simulation/SnowVolume.h"
 #include "Structures/GridBuffer.h"
 #include "Structures/HashTable.h"
-#include "OpenGL/Simulation/MeshBoundary.h"
-
-struct cudaGraphicsResource;
-struct CUstream_st;
-typedef CUstream_st* cudaStream_t;
-struct CUgraphExec_st;
-typedef CUgraphExec_st* cudaGraphExec_t;
+#include "Structures/ParticleBuffer.h"
 
 class Simulation
 {
 public:
-    Simulation(int maxParticleCount, int initialParticleCount, const ParticleBlock* initialParticleBlocks, int initialParticleBlockCount, unsigned int vbo);
+    Simulation(const SnowVolume& snowVolume, unsigned int vbo);
     ~Simulation();
+
     void Step();
     void SyncPositionsToVBO();
-    void UploadMeshBoundary(const MeshSDF& sdf) const;
+    void UpdatePhysicsParams();
     void ClearMeshBoundary() const;
-    void SetBoundaryVelocity(glm::vec3 velocity) const;
-    void ShiftSdfZ(int cells);
-    void Reset(const ParticleBlock* initialBlocks, int blockCount, int newParticleCount);
-    void AddParticles(const ParticleBlock* blocks, int blockCount, int additionalParticleCount);
-    int Grow();
-    void RebindVBO();
+    void MoveSledSDF(int movedCells) const;
+    void Reset(const SnowVolume& snowVolume);
+    void SetBoundaryVelocity(glm::vec3 velocity);
+    void UploadMeshBoundary(const MeshSDF& sdf) const;
+    void UnregisterVBO();
+    void RebindVBO(unsigned int vbo);
 
 private:
-    int particleCount;
-    int allocatedParticleCount;
-
     ParticleBlock* particleBlocks{};
     ParticleBlock* particleBlocksSortingBuffer{};
+
     GridBlock* gridBlocks{};
 
+    SimulationParameters hostSimulationParameters{};
+
     HashTable blockCodeToIndex{};
-    uint32_t* nextBlockIndex{};
-    uint64_t* blockCodes{};
-
-    uint64_t* particleSortKeys{};
-    uint64_t* particleSortKeysResult{};
-    uint32_t* particleIndices{};
-    uint32_t* sortedParticleIndices{};
-
-    uint64_t* particleHomeBlockCodes{};
-    uint32_t* rebuildFlag{};
-
-    void* nvidiaCUBTemporaryStorage = nullptr;
-
-    size_t nvidiaCUBTemporaryStorageBytes = 0;
 
     cudaGraphicsResource* vboResource{};
-    unsigned int vboId{};
-    float* sdfDistances{};
-    glm::vec3* sdfNormals{};
-    glm::vec3* boundaryVelocity{};
-
     cudaStream_t simulationStream{};
     cudaGraphExec_t simulationGraphExec{};
-    bool graphValid = false;
 
-    void AllocateParticleBuffers(int count);
-    void FreeParticleBuffers() const;
+    glm::vec3* sdfNormals{};
 
-    const int threadsPerBlock = 128;
+    uint64_t* blockCodes{};
+    uint64_t* particleSortKeys{};
+    uint64_t* particleSortKeysResult{};
+    uint64_t* particleHomeBlockCodes{};
+
+    uint32_t* nextBlockIndex{};
+    uint32_t* particleIndices{};
+    uint32_t* sortedParticleIndices{};
+    uint32_t* rebuildFlag{};
 
     uint32_t activeBlockCount = 0;
+    size_t nvidiaCUBTemporaryStorageBytes = 0;
+
+    float* sdfDistances{};
+    void* nvidiaCUBTemporaryStorage = nullptr;
+
+    unsigned int vboId{};
+    const int threadsPerBlock = 128;
+
+    bool graphValid = false;
+
+    int particleCount;
+
+    void WarpSort();
+    void SortParticles();
+    void SetRebuildFlag() const;
+    void UploadSimParams() const;
+    void DestroyGraphIfValid();
+    void ComputeHomeBlocks() const;
+    void FreeParticleBuffers() const;
+    void AllocateParticleBuffers(int count);
+
+    [[nodiscard]] int ParticleLaunchBlocks() const;
+    [[nodiscard]] static int ParticlesToBlocks(int count);
 };
 
 #endif

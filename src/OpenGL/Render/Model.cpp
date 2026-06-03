@@ -1,5 +1,5 @@
 #include "Model.h"
-#include <array>
+
 #include <glm/vec4.hpp>
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
@@ -7,15 +7,26 @@
 
 Model::Model(const std::string &path)
 {
-    this->modelPath = path;
+    this->modelPath = std::string(ASSETS_PATH) + path;
 }
 
-void Model::Draw(const Shader &shader) const
+std::vector<std::vector<glm::vec3>> Model::GetTriangles(const glm::mat4& modelMatrix) const
 {
-    for (auto &mesh: this->meshes)
+    std::vector<std::vector<glm::vec3>> triangles;
+
+    for (const auto& mesh : this->meshes)
     {
-        mesh.Draw(shader);
+        for (auto& triangle : mesh.GetTriangles())
+        {
+            const glm::vec3 firstVertex = glm::vec3(modelMatrix * glm::vec4(triangle[0], 1.0f));
+            const glm::vec3 secondVertex = glm::vec3(modelMatrix * glm::vec4(triangle[1], 1.0f));
+            const glm::vec3 thirdVertex = glm::vec3(modelMatrix * glm::vec4(triangle[2], 1.0f));
+
+            triangles.push_back({firstVertex, secondVertex, thirdVertex});
+        }
     }
+
+    return triangles;
 }
 
 void Model::loadModel()
@@ -34,27 +45,50 @@ void Model::loadModel()
     this->processNode(scene->mRootNode, scene);
 }
 
-void Model::processNode(const aiNode *node, const aiScene *scene)
+void Model::Draw(const Shader &shader) const
 {
-    try
+    for (auto &mesh: this->meshes)
     {
-        this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
+        mesh.Draw(shader);
     }
-    catch (const std::exception& exception)
+}
+
+std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *material, const aiTextureType type, const std::string &typeName)
+{
+    std::vector<Texture> textures;
+
+    for (int textureIndex = 0; textureIndex < material->GetTextureCount(type); textureIndex++)
     {
-        throw MPMException(exception.what(), Error::ModelMemoryAllocation);
+        aiString localPath;
+
+        material->GetTexture(type, textureIndex, &localPath);
+
+        bool skip = false;
+
+        for (auto & loadedTexture : this->loadedTextures)
+        {
+            if (std::strcmp(loadedTexture.path.data(), localPath.C_Str()) == 0)
+            {
+                textures.push_back(loadedTexture);
+                skip = true;
+                break;
+            }
+        }
+
+        if (!skip)
+        {
+            Texture texture;
+
+            texture.id = TextureLoader::Load(localPath.C_Str(), this->directory);
+            texture.type = typeName;
+            texture.path = localPath.C_Str();
+            textures.push_back(texture);
+
+            this->loadedTextures.push_back(texture);
+        }
     }
 
-    for (int meshIndex = 0; meshIndex < node->mNumMeshes; meshIndex++)
-    {
-        aiMesh *mesh = scene->mMeshes[node->mMeshes[meshIndex]];
-        this->processMesh(mesh, scene);
-    }
-
-    for (int childrenIndex = 0; childrenIndex < node->mNumChildren; childrenIndex++)
-    {
-        this->processNode(node->mChildren[childrenIndex], scene);
-    }
+    return textures;
 }
 
 void Model::processMesh(aiMesh *mesh, const aiScene *scene)
@@ -118,59 +152,25 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
     this->meshes.emplace_back(vertices, indices, textures);
 }
 
-std::vector<std::array<glm::vec3, 3>> Model::GetTriangles(const glm::mat4& modelMatrix) const
+void Model::processNode(const aiNode *node, const aiScene *scene)
 {
-    std::vector<std::array<glm::vec3, 3>> triangles;
-
-    for (const auto& mesh : this->meshes)
+    try
     {
-        for (auto& triangle : mesh.GetTriangles())
-        {
-            const glm::vec3 firstVertex = glm::vec3(modelMatrix * glm::vec4(triangle[0], 1.0f));
-            const glm::vec3 secondVertex = glm::vec3(modelMatrix * glm::vec4(triangle[1], 1.0f));
-            const glm::vec3 thirdVertex = glm::vec3(modelMatrix * glm::vec4(triangle[2], 1.0f));
-
-            triangles.push_back({firstVertex, secondVertex, thirdVertex});
-        }
+        this->meshes.reserve(this->meshes.size() + node->mNumMeshes);
+    }
+    catch (const std::exception& exception)
+    {
+        throw MPMException(exception.what(), Error::ModelMemoryAllocation);
     }
 
-    return triangles;
-}
-
-std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *material, const aiTextureType type, const std::string &typeName)
-{
-    std::vector<Texture> textures;
-
-    for (int textureIndex = 0; textureIndex < material->GetTextureCount(type); textureIndex++)
+    for (int meshIndex = 0; meshIndex < node->mNumMeshes; meshIndex++)
     {
-        aiString localPath;
-
-        material->GetTexture(type, textureIndex, &localPath);
-
-        bool skip = false;
-
-        for (int loadedTextureIndex = 0; loadedTextureIndex < this->loadedTextures.size(); loadedTextureIndex++)
-        {
-            if (std::strcmp(loadedTextures[loadedTextureIndex].path.data(), localPath.C_Str()) == 0)
-            {
-                textures.push_back(loadedTextures[loadedTextureIndex]);
-                skip = true;
-                break;
-            }
-        }
-
-        if (!skip)
-        {
-            Texture texture;
-
-            texture.id = TextureLoader::StaticLoad(localPath.C_Str(), this->directory);
-            texture.type = typeName;
-            texture.path = localPath.C_Str();
-            textures.push_back(texture);
-
-            this->loadedTextures.push_back(texture);
-        }
+        aiMesh *mesh = scene->mMeshes[node->mMeshes[meshIndex]];
+        this->processMesh(mesh, scene);
     }
 
-    return textures;
+    for (int childrenIndex = 0; childrenIndex < node->mNumChildren; childrenIndex++)
+    {
+        this->processNode(node->mChildren[childrenIndex], scene);
+    }
 }

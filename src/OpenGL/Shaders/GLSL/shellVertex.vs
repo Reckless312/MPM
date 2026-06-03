@@ -7,12 +7,12 @@ uniform mat4 projection;
 uniform float sphereRadius;
 uniform float viewportHeight;
 
-out vec3 eyeSpacePos;
+out vec3 viewSpacePosition;
 
 void main()
 {
-    vec4 eyePos = view * vec4(aPos, 1.0);
-    eyeSpacePos = eyePos.xyz;
-    gl_Position = projection * eyePos;
-    gl_PointSize = viewportHeight * projection[1][1] * sphereRadius / (-eyePos.z);
+    vec4 viewSpacePosition4 = view * vec4(aPos, 1.0);
+    viewSpacePosition = viewSpacePosition4.xyz;
+    gl_Position = projection * viewSpacePosition4;
+    gl_PointSize = viewportHeight * projection[1][1] * sphereRadius / (-viewSpacePosition4.z);
 }

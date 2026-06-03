@@ -4,6 +4,8 @@
 
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
+#include "Scene/SnowSled.h"
+#include "Simulation/SimulationConfig.h"
 
 Program::Program()
 {
@@ -15,9 +17,10 @@ Program::~Program()
     glfwTerminate();
 }
 
-void Program::SwitchPause()
+int Program::ReportErrorAndTerminate(const MPMException &exception)
 {
-    this->paused = !this->paused;
+    std::cout << exception.what() << std::endl;
+    return static_cast<int>(exception.GetErrorType());
 }
 
 void Program::InitializeGLFW()
@@ -26,6 +29,11 @@ void Program::InitializeGLFW()
 
     if (const int isInitialized = glfwInit(); isInitialized != GLFW_TRUE)
     {
+        if (const int errorCode = glfwGetError(nullptr); errorCode == GLFW_PLATFORM_UNAVAILABLE)
+        {
+            throw MPMException("Platform specified is not correct! Please update with the right information.", Error::WrongPlatform);
+        }
+
         throw MPMException("Failed to initialize GLFW.", Error::GLFWInitialization);
     }
 
@@ -33,25 +41,11 @@ void Program::InitializeGLFW()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Program::minorVersion);
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, Program::profile);
-}
 
-void Program::CreateWindowAndAssignContext()
-{
-    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* videoMode = glfwGetVideoMode(primaryMonitor);
-
-    Program::currentWidth = videoMode->width;
-    Program::currentHeight = videoMode->height;
-
-    GLFWmonitor* monitor = Program::recordingMode ? nullptr : primaryMonitor;
-    this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, monitor, Program::windowToShareResources);
-
-    if (this->window == nullptr)
+    if (Program::recordingMode)
     {
-        throw MPMException("Failed to create GLFW window.", Error::GLFWCreateWindow);
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     }
-
-    glfwMakeContextCurrent(this->window);
 }
 
 void Program::LoadGladLibrary()
@@ -62,37 +56,22 @@ void Program::LoadGladLibrary()
     }
 }
 
-void Program::SetViewportAndResizeCallback() const
+void Program::SetFloorUniforms(const Shader &shader)
 {
-    glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, Program::currentWidth, Program::currentHeight);
+    const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(SimulationConfig::gridSize, 1.0f, SimulationConfig::gridSize));
+    const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
 
-    glfwSetFramebufferSizeCallback(this->window, Program::ResizeWindow);
+    constexpr glm::vec3 objectColor = glm::vec3(0.12f, 0.18f, 0.28f);
+
+    shader.SetMat4("model", model);
+    shader.SetMat3("normalMatrix", normal);
+    shader.SetVec3("objectColor", objectColor);
 }
-
-bool Program::WasFirstSceneSelected() const
-{
-    return this->firstSceneKeyPressed && !this->firstSceneKeyWasDown;
-}
-
-bool Program::WasSecondSceneSelected() const
-{
-    return this->secondSceneKeyPressed && !this->secondSceneKeyWasDown;
-}
-
-bool Program::WasPauseKeyPressed() const
-{
-    return this->pauseKeyPressed && !this->pauseKeyWasDown;
-}
-
-bool Program::IsPaused() const
-{
-    return this->paused;
-}
-
 
 void Program::ResizeWindow(GLFWwindow *window, const int width, const int height)
 {
     glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, width, height);
+
     Program::currentWidth = width;
     Program::currentHeight = height;
 
@@ -102,29 +81,28 @@ void Program::ResizeWindow(GLFWwindow *window, const int width, const int height
     }
 }
 
-int Program::ReportErrorAndTerminate(const MPMException &exception)
+bool Program::IsKeyJustPressed(const int key)
 {
-    std::cout << exception.what() << std::endl;
-    return static_cast<int>(exception.GetErrorType());
+    const bool current = glfwGetKey(this->window, key) == GLFW_PRESS;
+    const bool pressed = current && !this->previousKeyStates[key];
+    this->previousKeyStates[key] = current;
+
+    return pressed;
 }
 
-void Program::ProcessInput()
+bool Program::IsPaused() const
 {
-    if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
-        glfwSetWindowShouldClose(this->window, true);
-    }
-
-    this->firstSceneKeyPressed = glfwGetKey(this->window, GLFW_KEY_1) == GLFW_PRESS;
-    this->secondSceneKeyPressed = glfwGetKey(this->window, GLFW_KEY_2) == GLFW_PRESS;
-    this->pauseKeyPressed = glfwGetKey(this->window, GLFW_KEY_SPACE) == GLFW_PRESS;
+    return this->paused;
 }
 
-void Program::UpdateKeyStates()
+int Program::GetActiveScene() const
 {
-    this->firstSceneKeyWasDown = this->firstSceneKeyPressed;
-    this->secondSceneKeyWasDown = this->secondSceneKeyPressed;
-    this->pauseKeyWasDown = this->pauseKeyPressed;
+    return this->activeScene;
+}
+
+int Program::GetRecordingScene() const
+{
+    return this->recordingScene;
 }
 
 void Program::UpdateDeltaTime()
@@ -133,6 +111,7 @@ void Program::UpdateDeltaTime()
 
     this->deltaTime = currentFrame - this->lastFrame;
     this->lastFrame = currentFrame;
+
 }
 
 void Program::LockCursor() const
@@ -145,26 +124,101 @@ void Program::LockCursor() const
     }
 }
 
-void Program::UpdateFPSOnWindowTitle() const
+void Program::SetRecordingScene(const int scene)
 {
-    if (this->deltaTime > 0.0f)
+    this->recordingScene = scene;
+}
+
+void Program::CreateWindowAndAssignContext()
+{
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* videoMode = glfwGetVideoMode(primaryMonitor);
+
+    Program::currentWidth = videoMode->width;
+    Program::currentHeight = videoMode->height;
+
+    GLFWmonitor* monitor = primaryMonitor;
+
+    if (Program::recordingMode)
     {
-        const int fps = static_cast<int>(1.0f / this->deltaTime);
-        const std::string title = std::string(Program::windowTitle) + " | FPS: " + std::to_string(fps);
-        glfwSetWindowTitle(this->window, title.c_str());
+        monitor = nullptr;
+    }
+
+    this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, monitor, Program::windowToShareResources);
+
+    if (this->window == nullptr)
+    {
+        throw MPMException("Failed to create GLFW window.", Error::GLFWCreateWindow);
+    }
+
+    glfwMakeContextCurrent(this->window);
+}
+
+void Program::SetViewportAndResizeCallback() const
+{
+    glViewport(Program::viewportBottomLeftX, Program::viewportBottomLeftY, Program::currentWidth, Program::currentHeight);
+
+    glfwSetFramebufferSizeCallback(this->window, Program::ResizeWindow);
+}
+
+void Program::SetSceneUniforms(const Shader& shader) const
+{
+    if (const auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(this->window)))
+    {
+        shader.SetMat4("view", camera->GetViewMatrix());
+        shader.SetMat4("projection", camera->GetProjectionMatrix());
+        shader.SetVec3("viewPosition", camera->GetPosition());
     }
 }
 
-int Program::RecordingSubstepsPerFrame()
+void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume)
 {
-    return static_cast<int>(std::roundf(1.0f / (static_cast<float>(recordingFrameRate) * physicsTimeStep)));
+    simulation.UnregisterVBO();
+
+    this->activeScene = scene;
+
+    SimulationConfig::SwitchScenesParameters(this->activeScene);
+
+    constexpr glm::vec3 nullifyVelocity = glm::vec3(0.0f);
+
+    simulation.UpdatePhysicsParams();
+    simulation.UploadMeshBoundary(boundarySDF);
+    simulation.SetBoundaryVelocity(nullifyVelocity);
+    particles.ResizeVBO(snowVolume.GetParticleCount());
+    simulation.Reset(snowVolume);
+
+    simulation.RebindVBO(particles.GetVBO());
+
+    Camera::ChangeOrientationOnScene(this->window, this->activeScene);
 }
 
-void Program::ApplySceneParameters(const SceneParameters& sceneParameters)
+void Program::ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes)
 {
-    firstLameParameter = sceneParameters.firstLameParameter;
-    secondLameParameter = sceneParameters.secondLameParameter;
-    hardeningCoefficient = sceneParameters.hardeningCoefficient;
-    criticalCompression = sceneParameters.criticalCompression;
-    criticalStretch = sceneParameters.criticalStretch;
+    if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    {
+        glfwSetWindowShouldClose(this->window, true);
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_SPACE))
+    {
+        this->paused = !this->paused;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_1))
+    {
+        this->ChangeScene(1, simulation, *boundarySDFs[0], particles, *snowVolumes[0]);
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_2))
+    {
+        this->ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1]);
+
+        SnowSled::sledCenterZ = SnowSled::sledInitialZ;
+        SnowSled::sledAccumulatedZ = 0.0f;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_3))
+    {
+        this->ChangeScene(3, simulation, *boundarySDFs[2], particles, *snowVolumes[2]);
+    }
 }

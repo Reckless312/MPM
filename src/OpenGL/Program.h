@@ -1,107 +1,80 @@
 #ifndef MPM_METHOD_PROGRAM_H
 #define MPM_METHOD_PROGRAM_H
 
+#include <array>
+#include <map>
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include "CUDA/Simulation.h"
 #include "Exceptions/MPMException.h"
-
-struct SceneParameters
-{
-    float firstLameParameter;
-    float secondLameParameter;
-    float hardeningCoefficient;
-    float criticalCompression;
-    float criticalStretch;
-};
+#include "Render/Particle.h"
+#include "Simulation/MeshBoundary.h"
+#include "Simulation/SnowVolume.h"
 
 class Program
 {
 public:
-    GLFWwindow* window;
-
-    /* Time between frames */
-    float deltaTime = 0.0f;
-
-    /* Simulation Settings */
-    inline static int currentWidth = 800;
-    inline static int currentHeight = 600;
-
-    inline static int maxBlocks = 16384;
-    inline static int cellCountPerAxis = 256;
-    inline static float cellSize = 0.02f;
-    inline static float physicsTimeStep = 3e-4f;
-    //inline static float physicsTimeStep = 1e-4f;
-    inline static float gravity = 9.8f;
-    inline static bool recordingMode = false;
-    inline static int recordingFrameRate = 144;
-    inline static int recordingDurationSeconds = 5;
-    inline static const char* recordingOutputPathScene1 = "/home/cora/Videos/scene1.mp4";
-    inline static const char* recordingOutputPathScene2 = "/home/cora/Videos/scene2.mp4";
-    inline static float firstLameParameter = 1.333e4f;
-    inline static float secondLameParameter = 2.0e4f;
-    inline static float hardeningCoefficient = 10.0f;
-    inline static float criticalCompression = 0.025f;
-    inline static float criticalStretch = 0.0075f;
-    inline static float boundaryFriction = 0.8f;
-
-    /* Particle Rendering */
-    inline static constexpr float particleShellRadius = 0.018f;
-    inline static constexpr float shellInnerFraction = 0.85f;
-    /* ---- */
-
     explicit Program();
     ~Program();
 
-    void SwitchPause();
-    void ProcessInput();
-    void UpdateKeyStates();
-    void UpdateDeltaTime();
-    void LockCursor() const;
-    void UpdateFPSOnWindowTitle() const;
-    void CreateWindowAndAssignContext();
-    void SetViewportAndResizeCallback() const;
+    GLFWwindow* window;
 
-    [[nodiscard]] bool WasFirstSceneSelected() const;
-    [[nodiscard]] bool WasSecondSceneSelected() const;
-    [[nodiscard]] bool WasPauseKeyPressed() const;
-    [[nodiscard]] bool IsPaused() const;
+    inline static const char* logoSceneOutputPath = "/home/cora/Videos/logo_scene.mp4";
+    inline static const char* sledSceneOutputPath = "/home/cora/Videos/sled_scene.mp4";
 
-    static void ApplySceneParameters(const SceneParameters& sceneParameters);
-    static int RecordingSubstepsPerFrame();
-    static void InitializeGLFW();
-    static void LoadGladLibrary();
-    static void ResizeWindow(GLFWwindow* window, int width, int height);
+    inline static bool recordingMode = false;
+
+    inline static int currentWidth = 800;
+    inline static int currentHeight = 600;
+    inline static int recordingFrameRate = 144;
+    inline static int recordingDurationSeconds = 10;
+
+    float deltaTime = 0.0f;
 
     static int ReportErrorAndTerminate(const MPMException& exception);
-private:
-    /* OpenGL Settings */
-    static constexpr int majorVersion = 3;
-    static constexpr int minorVersion = 3;
-    static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
-    static constexpr int glfwPlatform = GLFW_PLATFORM_X11;
 
-    static constexpr GLFWmonitor* fullscreenMonitor = nullptr;
+    static void InitializeGLFW();
+    static void LoadGladLibrary();
+    static void SetFloorUniforms(const Shader& shader);
+    static void ResizeWindow(GLFWwindow* window, int width, int height);
+
+    [[nodiscard]] bool IsKeyJustPressed(int key);
+    [[nodiscard]] bool IsPaused() const;
+
+    [[nodiscard]] int GetActiveScene() const;
+    [[nodiscard]] int GetRecordingScene() const;
+
+    void UpdateDeltaTime();
+    void LockCursor() const;
+    void SetRecordingScene(int scene);
+    void CreateWindowAndAssignContext();
+    void SetViewportAndResizeCallback() const;
+    void SetSceneUniforms(const Shader& shader) const;
+    void ChangeScene(int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume);
+    void ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes);
+private:
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 
     static constexpr GLint viewportBottomLeftX = 0;
     static constexpr GLint viewportBottomLeftY = 0;
 
-    static constexpr GLsizei windowWidth = 800;
-    static constexpr GLsizei windowHeight = 600;
-
     inline static const char* windowTitle = "MPM Snow Simulation";
-    /* ---- */
+
+    std::map<int, bool> previousKeyStates;
+
+    static constexpr int majorVersion = 3;
+    static constexpr int minorVersion = 3;
+    static constexpr int glfwPlatform = GLFW_PLATFORM_X11;
+    static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
+
+    bool paused = false;
 
     float lastFrame = 0.0f;
 
-    bool firstSceneKeyPressed = false;
-    bool firstSceneKeyWasDown = false;
-    bool secondSceneKeyPressed = false;
-    bool secondSceneKeyWasDown = false;
-    bool pauseKeyPressed = false;
-    bool pauseKeyWasDown = false;
-    bool paused = false;
+    int activeScene = 1;
+    int recordingScene = 1;
 };
 
 

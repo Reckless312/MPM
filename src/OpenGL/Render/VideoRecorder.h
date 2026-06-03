@@ -7,27 +7,29 @@
 class VideoRecorder
 {
 public:
-    VideoRecorder(int width, int height, const char* outputPath);
+    VideoRecorder(int width, int height);
     ~VideoRecorder();
-
-    void BeginFrame() const;
-    void EndFrame();
 
     [[nodiscard]] bool IsDone() const;
 
+    void EndFrame();
+    void BeginFrame() const;
+    void Open(const char* outputPath);
+
 private:
     GLuint fbo{};
-    GLuint fboTexture{};
-    GLuint fboDepth{};
     GLuint pbos[2]{};
+    GLuint fboDepth{};
+    GLuint fboTexture{};
 
     FILE* ffmpegPipe{};
 
-    int pboIndex{};
-    int frameCount{};
-    int totalFrames{};
     int width{};
     int height{};
+    int pboIndex{};
+    int frameSize{};
+    int frameCount{};
+    int totalFrames{};
 };
 
 #endif

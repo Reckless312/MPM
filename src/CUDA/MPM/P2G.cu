@@ -1,46 +1,11 @@
 #include "P2G.h"
 
-
-#include "../Preparation/RebuildMapping.h"
+#include "../Preparation/RegisterActiveBlocks.h"
 #include "../Structures/Morton.h"
-#include <cuda_runtime.h>
+#include "../SimulationParameters.h"
 #include <svd3/svd3_cuda.h>
 
-__device__ uint64_t ComputeParticleBlockCode(const float positionX, const float positionY, const float positionZ, const float cellSize)
-{
-    const float inverseCellSize = 1.0f / cellSize;
-
-    const float gridPositionX = positionX * inverseCellSize;
-    const float gridPositionY = positionY * inverseCellSize;
-    const float gridPositionZ = positionZ * inverseCellSize;
-
-    const int cellX = static_cast<int>(floorf(gridPositionX - freeZoneShift));
-    const int cellY = static_cast<int>(floorf(gridPositionY - freeZoneShift));
-    const int cellZ = static_cast<int>(floorf(gridPositionZ - freeZoneShift));
-
-    const int blockX = cellX / blockSize;
-    const int blockY = cellY / blockSize;
-    const int blockZ = cellZ / blockSize;
-
-    return MortonEncode(blockX, blockY, blockZ);
-}
-
-__device__ void ComputeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
-{
-    weightsX[0] = 0.5f * (1.5f - fractionalX) * (1.5f - fractionalX);
-    weightsX[1] = 0.75f - (fractionalX - 1.0f) * (fractionalX - 1.0f);
-    weightsX[2] = 0.5f * (fractionalX - 0.5f) * (fractionalX - 0.5f);
-
-    weightsY[0] = 0.5f * (1.5f - fractionalY) * (1.5f - fractionalY);
-    weightsY[1] = 0.75f - (fractionalY - 1.0f) * (fractionalY - 1.0f);
-    weightsY[2] = 0.5f * (fractionalY - 0.5f) * (fractionalY - 0.5f);
-
-    weightsZ[0] = 0.5f * (1.5f - fractionalZ) * (1.5f - fractionalZ);
-    weightsZ[1] = 0.75f - (fractionalZ - 1.0f) * (fractionalZ - 1.0f);
-    weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
-}
-
-__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, const float deltaTime, const float shearModulus, const float firstLameParameter, const float hardeningCoefficient, const bool shouldRecordHomeBlocks, uint64_t* particleHomeBlockCodes)
+__global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBlocks, const int particleCount, const HashTable& blockCodeToIndex)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -55,11 +20,6 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
-
-    if (shouldRecordHomeBlocks)
-    {
-        particleHomeBlockCodes[particleIndex] = ComputeParticleBlockCode(positionX, positionY, positionZ, cellSize);
-    }
 
     const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
     const float velocityY = particleBlocks[particleBlockIndex].velocityY[lane];
@@ -114,9 +74,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
         a[componentIndex] = deformationGradient[componentIndex] - r[componentIndex];
     }
 
-    const float hardening = expf(fmaxf(-10.0f, fminf(hardeningCoefficient * (1.0f - plasticVolume), 10.0f)));
-    const float effectiveShearModulus = shearModulus * hardening;
-    const float effectiveFirstLameParameter = firstLameParameter * hardening;
+    const float hardening = expf(fmaxf(-10.0f, fminf(simulationParameters.hardeningCoefficient * (1.0f - plasticVolume), 10.0f)));
+    const float effectiveShearModulus = simulationParameters.secondLameParameter * hardening;
+    const float effectiveFirstLameParameter = simulationParameters.firstLameParameter * hardening;
     const float volumetricStress = effectiveFirstLameParameter * (J - 1.0f) * J;
 
     float kirchhoff[9];
@@ -136,9 +96,9 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
         }
     }
 
-    const float stressScale = -4.0f / (cellSize * cellSize) * volume * deltaTime;
+    const float stressScale = -4.0f / (simulationParameters.cellSize * simulationParameters.cellSize) * volume * simulationParameters.deltaTime;
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;
@@ -170,6 +130,8 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
     sharedWeights[7 * weightStride + threadOffset] = weightsZ[1];
     sharedWeights[8 * weightStride + threadOffset] = weightsZ[2];
 
+    const unsigned int warpMask = __activemask();
+
     for (int neighborX = 0; neighborX < 3; neighborX++)
     {
         for (int neighborY = 0; neighborY < 3; neighborY++)
@@ -180,16 +142,35 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const int nodeY = baseY + neighborY;
                 const int nodeZ = baseZ + neighborZ;
 
-                if (nodeX < 0 || nodeY < 0 || nodeZ < 0)
+                uint32_t blockIndex = BLOCK_NOT_FOUND;
+                uint32_t nodeLane = 0;
+
+                if (nodeX >= 0 && nodeY >= 0 && nodeZ >= 0)
                 {
-                    continue;
+                    const int nodeBlockX = nodeX / blockSize;
+                    const int nodeBlockY = nodeY / blockSize;
+                    const int nodeBlockZ = nodeZ / blockSize;
+
+                    const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
+                    blockIndex = Lookup(blockCodeToIndex, blockCode);
+                }
+
+                const bool valid = blockIndex != BLOCK_NOT_FOUND;
+
+                if (valid)
+                {
+                    const auto localX = static_cast<uint32_t>(nodeX % blockSize);
+                    const auto localY = static_cast<uint32_t>(nodeY % blockSize);
+                    const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
+
+                    nodeLane = localX + localY * blockSize + localZ * blockSize * blockSize;
                 }
 
                 const float weight = sharedWeights[neighborX * weightStride + threadOffset] * sharedWeights[(3 + neighborY) * weightStride + threadOffset] * sharedWeights[(6 + neighborZ) * weightStride + threadOffset];
 
-                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * cellSize;
-                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * cellSize;
-                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * cellSize;
+                const float particleToNodeOffsetX = (static_cast<float>(nodeX) - gridPositionX) * simulationParameters.cellSize;
+                const float particleToNodeOffsetY = (static_cast<float>(nodeY) - gridPositionY) * simulationParameters.cellSize;
+                const float particleToNodeOffsetZ = (static_cast<float>(nodeZ) - gridPositionZ) * simulationParameters.cellSize;
 
                 const float stressForceX = kirchhoff[0] * particleToNodeOffsetX + kirchhoff[1] * particleToNodeOffsetY + kirchhoff[2] * particleToNodeOffsetZ;
                 const float stressForceY = kirchhoff[3] * particleToNodeOffsetX + kirchhoff[4] * particleToNodeOffsetY + kirchhoff[5] * particleToNodeOffsetZ;
@@ -199,29 +180,70 @@ __global__ void P2GKernel(const ParticleBlock* particleBlocks, GridBlock* gridBl
                 const float momentumY = mass * (velocityY + affineMomentumMatrix[3] * particleToNodeOffsetX + affineMomentumMatrix[4] * particleToNodeOffsetY + affineMomentumMatrix[5] * particleToNodeOffsetZ) + stressScale * stressForceY;
                 const float momentumZ = mass * (velocityZ + affineMomentumMatrix[6] * particleToNodeOffsetX + affineMomentumMatrix[7] * particleToNodeOffsetY + affineMomentumMatrix[8] * particleToNodeOffsetZ) + stressScale * stressForceZ;
 
-                const int nodeBlockX = nodeX / blockSize;
-                const int nodeBlockY = nodeY / blockSize;
-                const int nodeBlockZ = nodeZ / blockSize;
+                float weightedMass = 0.0f, weightedMomentumX = 0.0f, weightedMomentumY = 0.0f, weightedMomentumZ = 0.0f;
+                uint32_t key = 0xFFFFFFFFu;
 
-                const uint64_t blockCode = MortonEncode(nodeBlockX, nodeBlockY, nodeBlockZ);
-                const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
-
-                if (blockIndex == UINT32_MAX)
+                if (valid)
                 {
-                    continue;
+                    key = ((blockIndex << 9) | nodeLane);
+
+                    weightedMass = mass * weight;
+
+                    weightedMomentumX = momentumX * weight;
+                    weightedMomentumY = momentumY * weight;
+                    weightedMomentumZ = momentumZ * weight;
                 }
 
-                const auto localX = static_cast<uint32_t>(nodeX % blockSize);
-                const auto localY = static_cast<uint32_t>(nodeY % blockSize);
-                const auto localZ = static_cast<uint32_t>(nodeZ % blockSize);
+                const unsigned int match = __match_any_sync(warpMask, key);
 
-                const uint32_t nodeLane = localX | (localY << 3) | (localZ << 6);
+                for (int reductionOffset = 16; reductionOffset > 0; reductionOffset >>= 1)
+                {
+                    const float peerMass = __shfl_down_sync(warpMask, weightedMass, reductionOffset);
 
-                atomicAdd(&gridBlocks[blockIndex].mass[nodeLane], weight * mass);
-                atomicAdd(&gridBlocks[blockIndex].velocityX[nodeLane], momentumX * weight);
-                atomicAdd(&gridBlocks[blockIndex].velocityY[nodeLane], momentumY * weight);
-                atomicAdd(&gridBlocks[blockIndex].velocityZ[nodeLane], momentumZ * weight);
+                    const float peerMomentumX = __shfl_down_sync(warpMask, weightedMomentumX, reductionOffset);
+                    const float peerMomentumY = __shfl_down_sync(warpMask, weightedMomentumY, reductionOffset);
+                    const float peerMomentumZ = __shfl_down_sync(warpMask, weightedMomentumZ, reductionOffset);
+
+                    const int peer = lane + reductionOffset;
+                    // ReSharper disable once CppTooWideScopeInitStatement
+                    const bool validPeer = peer < 32;
+
+                    if (validPeer && ((match >> static_cast<unsigned int>(peer)) & 1u))
+                    {
+                        weightedMass += peerMass;
+                        weightedMomentumX += peerMomentumX;
+                        weightedMomentumY += peerMomentumY;
+                        weightedMomentumZ += peerMomentumZ;
+                    }
+                }
+
+
+                // ReSharper disable once CppTooWideScopeInitStatement
+                int updatingLane = __ffs(static_cast<int>(match)) - 1;
+
+                if (valid && lane == updatingLane)
+                {
+                    atomicAdd(&gridBlocks[blockIndex].mass[nodeLane], weightedMass);
+                    atomicAdd(&gridBlocks[blockIndex].velocityX[nodeLane], weightedMomentumX);
+                    atomicAdd(&gridBlocks[blockIndex].velocityY[nodeLane], weightedMomentumY);
+                    atomicAdd(&gridBlocks[blockIndex].velocityZ[nodeLane], weightedMomentumZ);
+                }
             }
         }
     }
+}
+
+__device__ void ComputeBSplineWeights(const float fractionalX, const float fractionalY, const float fractionalZ, float weightsX[3], float weightsY[3], float weightsZ[3])
+{
+    weightsX[0] = 0.5f * (1.5f - fractionalX) * (1.5f - fractionalX);
+    weightsX[1] = 0.75f - (fractionalX - 1.0f) * (fractionalX - 1.0f);
+    weightsX[2] = 0.5f * (fractionalX - 0.5f) * (fractionalX - 0.5f);
+
+    weightsY[0] = 0.5f * (1.5f - fractionalY) * (1.5f - fractionalY);
+    weightsY[1] = 0.75f - (fractionalY - 1.0f) * (fractionalY - 1.0f);
+    weightsY[2] = 0.5f * (fractionalY - 0.5f) * (fractionalY - 0.5f);
+
+    weightsZ[0] = 0.5f * (1.5f - fractionalZ) * (1.5f - fractionalZ);
+    weightsZ[1] = 0.75f - (fractionalZ - 1.0f) * (fractionalZ - 1.0f);
+    weightsZ[2] = 0.5f * (fractionalZ - 0.5f) * (fractionalZ - 0.5f);
 }

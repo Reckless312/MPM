@@ -1,11 +1,24 @@
 #include "SortParticles.h"
-#include "RebuildMapping.h"
+
+#include "RegisterActiveBlocks.h"
 #include "../Structures/Morton.h"
+#include "../SimulationParameters.h"
 #include "../CudaCheck.h"
-#include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
-__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys, const float cellSize)
+__global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
+{
+    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
+
+    if (particleIndex >= particleCount)
+    {
+        return;
+    }
+
+    indices[particleIndex] = static_cast<uint32_t>(particleIndex);
+}
+
+__global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* sortKeys)
 {
     const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
 
@@ -21,7 +34,7 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
     const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
 
-    const float inverseCellSize = 1.0f / cellSize;
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
 
     const float gridPositionX = positionX * inverseCellSize;
     const float gridPositionY = positionY * inverseCellSize;
@@ -38,7 +51,7 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
     const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
 
-    if (blockIndex == UINT32_MAX)
+    if (blockIndex == BLOCK_NOT_FOUND)
     {
         sortKeys[particleIndex] = UINT64_MAX;
         return;
@@ -48,9 +61,147 @@ __global__ void ComputeSortKeysKernel(const ParticleBlock* particleBlocks, const
     const auto localY = static_cast<uint32_t>(cellY % blockSize);
     const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
 
-    const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
+    const uint32_t cellCode = localX + localY * blockSize + localZ * blockSize * blockSize;
 
-    sortKeys[particleIndex] = (static_cast<uint64_t>(blockIndex) << cellBits) | cellCode;
+    sortKeys[particleIndex] = (static_cast<uint64_t>(blockIndex) << simulationParameters.cellBits) | cellCode;
+}
+
+__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, uint64_t* particleHomeBlockCodes)
+{
+    const int particleBlockIndex = static_cast<int>(blockIdx.x);
+    const int lane = static_cast<int>(threadIdx.x);
+
+    const int particleIndex = particleBlockIndex * 32 + lane;
+
+    const float inverseCellSize = 1.0f / simulationParameters.cellSize;
+
+    uint32_t key;
+
+    if (particleIndex < particleCount)
+    {
+        const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
+        const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
+        const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
+
+        const float gridPositionX = positionX * inverseCellSize;
+        const float gridPositionY = positionY * inverseCellSize;
+        const float gridPositionZ = positionZ * inverseCellSize;
+
+        const int cellX = static_cast<int>(floorf(gridPositionX - freeZoneShift));
+        const int cellY = static_cast<int>(floorf(gridPositionY - freeZoneShift));
+        const int cellZ = static_cast<int>(floorf(gridPositionZ - freeZoneShift));
+
+        const int blockX = cellX / blockSize;
+        const int blockY = cellY / blockSize;
+        const int blockZ = cellZ / blockSize;
+
+        const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
+
+        // ReSharper disable once CppTooWideScopeInitStatement
+        const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
+
+        if (blockIndex == BLOCK_NOT_FOUND)
+        {
+            key = BLOCK_NOT_FOUND;
+        }
+        else
+        {
+            const auto localX = static_cast<uint32_t>(cellX % blockSize);
+            const auto localY = static_cast<uint32_t>(cellY % blockSize);
+            const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
+
+            const uint32_t cellCode = localX + localY * blockSize + localZ * blockSize * blockSize;
+
+            key = (blockIndex << simulationParameters.cellBits) | cellCode;
+        }
+    }
+    else
+    {
+        key = BLOCK_NOT_FOUND;
+    }
+
+    auto sourceLane = static_cast<uint32_t>(lane);
+
+    constexpr unsigned int fullWarpMask = 0xFFFFFFFF;
+
+    for (int mergeSize = 2; mergeSize <= 32; mergeSize <<= 1)
+    {
+        for (int stride = mergeSize >> 1; stride > 0; stride >>= 1)
+        {
+            const uint32_t partnerKey = __shfl_xor_sync(fullWarpMask, key, stride);
+            const uint32_t partnerSourceLane = __shfl_xor_sync(fullWarpMask, sourceLane, stride);
+
+            bool shouldSwap = false;
+
+            const bool isLower = (lane & stride) == 0;
+            // ReSharper disable once CppTooWideScopeInitStatement
+            const bool ascending = (lane & mergeSize) == 0;
+
+            if ((isLower == ascending))
+            {
+                shouldSwap = (key > partnerKey);
+            }
+            else
+            {
+                shouldSwap = (key < partnerKey);
+            }
+
+            if (shouldSwap)
+            {
+                key = partnerKey;
+                sourceLane = partnerSourceLane;
+            }
+        }
+    }
+
+    const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
+    const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
+    const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
+
+    const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
+    const float velocityY = particleBlocks[particleBlockIndex].velocityY[lane];
+    const float velocityZ = particleBlocks[particleBlockIndex].velocityZ[lane];
+
+    float deformationGradient[9];
+    float affineMomentumMatrix[9];
+
+    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
+    {
+        deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
+        affineMomentumMatrix[componentIndex] = particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane];
+    }
+
+    const float mass = particleBlocks[particleBlockIndex].mass[lane];
+    const float volume = particleBlocks[particleBlockIndex].volume[lane];
+    const float plasticVolume = particleBlocks[particleBlockIndex].plasticVolume[lane];
+
+    const uint64_t homeBlockCode = particleHomeBlockCodes[particleIndex];
+
+    const auto homeBlockCodeLow = static_cast<uint32_t>(homeBlockCode);
+    const auto homeBlockCodeHigh = static_cast<uint32_t>(homeBlockCode >> 32);
+
+    particleBlocks[particleBlockIndex].positionX[lane] = __shfl_sync(fullWarpMask, positionX, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].positionY[lane] = __shfl_sync(fullWarpMask, positionY, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].positionZ[lane] = __shfl_sync(fullWarpMask, positionZ, static_cast<int>(sourceLane));
+
+    particleBlocks[particleBlockIndex].velocityX[lane] = __shfl_sync(fullWarpMask, velocityX, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(fullWarpMask, velocityY, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(fullWarpMask, velocityZ, static_cast<int>(sourceLane));
+
+    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
+    {
+        particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = __shfl_sync(fullWarpMask, deformationGradient[componentIndex], static_cast<int>(sourceLane));
+        particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = __shfl_sync(fullWarpMask, affineMomentumMatrix[componentIndex], static_cast<int>(sourceLane));
+    }
+
+    particleBlocks[particleBlockIndex].mass[lane] = __shfl_sync(fullWarpMask, mass, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].volume[lane] = __shfl_sync(fullWarpMask, volume, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].plasticVolume[lane] = __shfl_sync(fullWarpMask, plasticVolume, static_cast<int>(sourceLane));
+
+    const uint32_t sortedHomeBlockCodeLow = __shfl_sync(fullWarpMask, homeBlockCodeLow, static_cast<int>(sourceLane));
+    const uint32_t sortedHomeBlockCodeHigh = __shfl_sync(fullWarpMask, homeBlockCodeHigh, static_cast<int>(sourceLane));
+
+    particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 
 __global__ void ReorderParticlesKernel(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const uint32_t* sortedIndices, const int particleCount)
@@ -87,172 +238,4 @@ __global__ void ReorderParticlesKernel(const ParticleBlock* inputBlocks, Particl
     outputBlocks[newParticleBlockIndex].mass[newParticleLane] = inputBlocks[oldParticleBlockIndex].mass[oldParticleLane];
     outputBlocks[newParticleBlockIndex].volume[newParticleLane] = inputBlocks[oldParticleBlockIndex].volume[oldParticleLane];
     outputBlocks[newParticleBlockIndex].plasticVolume[newParticleLane] = inputBlocks[oldParticleBlockIndex].plasticVolume[oldParticleLane];
-}
-
-__global__ void InitIndicesKernel(uint32_t* indices, const int particleCount)
-{
-    const int particleIndex = static_cast<int>(blockIdx.x * blockDim.x + threadIdx.x);
-
-    if (particleIndex >= particleCount)
-    {
-        return;
-    }
-
-    indices[particleIndex] = static_cast<uint32_t>(particleIndex);
-}
-
-__global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particleCount, const HashTable &blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes)
-{
-    const int particleBlockIndex = static_cast<int>(blockIdx.x);
-    const int lane = static_cast<int>(threadIdx.x);
-
-    const int particleIndex = particleBlockIndex * 32 + lane;
-
-    const float inverseCellSize = 1.0f / cellSize;
-
-    uint32_t key;
-
-    if (particleIndex < particleCount)
-    {
-        const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
-        const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
-        const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
-
-        const float gridPositionX = positionX * inverseCellSize;
-        const float gridPositionY = positionY * inverseCellSize;
-        const float gridPositionZ = positionZ * inverseCellSize;
-
-        const int cellX = static_cast<int>(floorf(gridPositionX - freeZoneShift));
-        const int cellY = static_cast<int>(floorf(gridPositionY - freeZoneShift));
-        const int cellZ = static_cast<int>(floorf(gridPositionZ - freeZoneShift));
-
-        const int blockX = cellX / blockSize;
-        const int blockY = cellY / blockSize;
-        const int blockZ = cellZ / blockSize;
-
-        const uint64_t blockCode = MortonEncode(blockX, blockY, blockZ);
-
-        // ReSharper disable once CppTooWideScopeInitStatement
-        const uint32_t blockIndex = Lookup(blockCodeToIndex, blockCode);
-
-        if (blockIndex == UINT32_MAX)
-        {
-            key = UINT32_MAX;
-        }
-        else
-        {
-            const auto localX = static_cast<uint32_t>(cellX % blockSize);
-            const auto localY = static_cast<uint32_t>(cellY % blockSize);
-            const auto localZ = static_cast<uint32_t>(cellZ % blockSize);
-
-            const uint32_t cellCode = localX | (localY << 3) | (localZ << 6);
-
-            key = (blockIndex << cellBits) | cellCode;
-        }
-    }
-    else
-    {
-        key = UINT32_MAX;
-    }
-
-    auto sourceLane = static_cast<uint32_t>(lane);
-
-    for (int mergeSize = 2; mergeSize <= 32; mergeSize <<= 1)
-    {
-        for (int stride = mergeSize >> 1; stride > 0; stride >>= 1)
-        {
-            const uint32_t partnerKey = __shfl_xor_sync(0xFFFFFFFF, key, stride);
-            const uint32_t partnerSourceLane = __shfl_xor_sync(0xFFFFFFFF, sourceLane, stride);
-
-            bool shouldSwap = false;
-
-            const bool isLower = (lane & stride) == 0;
-            // ReSharper disable once CppTooWideScopeInitStatement
-            const bool ascending = (lane & mergeSize) == 0;
-
-            if ((isLower == ascending))
-            {
-                shouldSwap = (key > partnerKey);
-            }
-            else
-            {
-                shouldSwap = (key < partnerKey);
-            }
-
-            if (shouldSwap)
-            {
-                key = partnerKey;
-                sourceLane = partnerSourceLane;
-            }
-        }
-    }
-
-    const float positionX = particleBlocks[particleBlockIndex].positionX[lane];
-    const float positionY = particleBlocks[particleBlockIndex].positionY[lane];
-    const float positionZ = particleBlocks[particleBlockIndex].positionZ[lane];
-    const float velocityX = particleBlocks[particleBlockIndex].velocityX[lane];
-    const float velocityY = particleBlocks[particleBlockIndex].velocityY[lane];
-    const float velocityZ = particleBlocks[particleBlockIndex].velocityZ[lane];
-
-    float deformationGradient[9];
-    float affineMomentumMatrix[9];
-
-    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
-    {
-        deformationGradient[componentIndex] = particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane];
-        affineMomentumMatrix[componentIndex] = particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane];
-    }
-
-    const float mass = particleBlocks[particleBlockIndex].mass[lane];
-    const float volume = particleBlocks[particleBlockIndex].volume[lane];
-    const float plasticVolume = particleBlocks[particleBlockIndex].plasticVolume[lane];
-
-    const uint64_t homeBlockCode = particleHomeBlockCodes[particleIndex];
-
-    const auto homeBlockCodeLow = static_cast<uint32_t>(homeBlockCode);
-    const auto homeBlockCodeHigh = static_cast<uint32_t>(homeBlockCode >> 32);
-
-    particleBlocks[particleBlockIndex].positionX[lane] = __shfl_sync(0xFFFFFFFF, positionX, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].positionY[lane] = __shfl_sync(0xFFFFFFFF, positionY, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].positionZ[lane] = __shfl_sync(0xFFFFFFFF, positionZ, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].velocityX[lane] = __shfl_sync(0xFFFFFFFF, velocityX, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(0xFFFFFFFF, velocityY, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(0xFFFFFFFF, velocityZ, static_cast<int>(sourceLane));
-
-    for (int componentIndex = 0; componentIndex < 9; componentIndex++)
-    {
-        particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = __shfl_sync(0xFFFFFFFF, deformationGradient[componentIndex], static_cast<int>(sourceLane));
-        particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = __shfl_sync(0xFFFFFFFF, affineMomentumMatrix[componentIndex], static_cast<int>(sourceLane));
-    }
-
-    particleBlocks[particleBlockIndex].mass[lane] = __shfl_sync(0xFFFFFFFF, mass, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].volume[lane] = __shfl_sync(0xFFFFFFFF, volume, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].plasticVolume[lane] = __shfl_sync(0xFFFFFFFF, plasticVolume, static_cast<int>(sourceLane));
-
-    const uint32_t sortedHomeBlockCodeLow = __shfl_sync(0xFFFFFFFF, homeBlockCodeLow, static_cast<int>(sourceLane));
-    const uint32_t sortedHomeBlockCodeHigh = __shfl_sync(0xFFFFFFFF, homeBlockCodeHigh, static_cast<int>(sourceLane));
-    particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
-}
-
-void WarpSort(ParticleBlock* particleBlocks, const int particleCount, const HashTable& blockCodeToIndex, const float cellSize, uint64_t* particleHomeBlockCodes, const cudaStream_t stream)
-{
-    const int particleBlockCount = (particleCount + 31) / 32;
-    WarpSortKernel<<<particleBlockCount, 32, 0, stream>>>(particleBlocks, particleCount, blockCodeToIndex, cellSize, particleHomeBlockCodes);
-}
-
-void SortParticles(const ParticleBlock* inputBlocks, ParticleBlock* outputBlocks, const HashTable& blockCodeToIndex, const int particleCount, const float cellSize, uint64_t* sortKeys, uint64_t* sortKeysOut, uint32_t* indices, uint32_t* sortedIndices, void* tempStorage, size_t& tempStorageBytes, const cudaStream_t stream)
-{
-    constexpr int threadsPerBlock = 256;
-    const int threadBlocks = (particleCount + threadsPerBlock - 1) / threadsPerBlock;
-
-    InitIndicesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(indices, particleCount);
-    CUDA_CHECK(cudaGetLastError());
-
-    ComputeSortKeysKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, particleCount, blockCodeToIndex, sortKeys, cellSize);
-    CUDA_CHECK(cudaGetLastError());
-
-    CUDA_CHECK(cub::DeviceRadixSort::SortPairs(tempStorage, tempStorageBytes, sortKeys, sortKeysOut, indices, sortedIndices, particleCount, 0, sizeof(uint64_t) * 8, stream));
-
-    ReorderParticlesKernel<<<threadBlocks, threadsPerBlock, 0, stream>>>(inputBlocks, outputBlocks, sortedIndices, particleCount);
-    CUDA_CHECK(cudaGetLastError());
 }

@@ -9,7 +9,6 @@
 
 # Visual Studio
 .vs
-*.obj
 *.pdb
 *.idb
 *.ilk

@@ -18,6 +18,11 @@ Shader::~Shader()
     glDeleteProgram(this->id);
 }
 
+void Shader::Use() const
+{
+    glUseProgram(this->id);
+}
+
 void Shader::Load() const
 {
     const std::string vertexStringCode = Shader::ReadShader(this->vertexShaderPath);
@@ -46,38 +51,6 @@ void Shader::Load() const
 
     glDeleteShader(vertexId);
     glDeleteShader(fragmentId);
-}
-
-std::string Shader::ReadShader(const std::string& path)
-{
-    std::string shaderCode;
-
-    std::ifstream shaderFile;
-
-    shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-
-    try
-    {
-        shaderFile.open(path);
-
-        std::stringstream shaderStream;
-        shaderStream << shaderFile.rdbuf();
-
-        shaderFile.close();
-
-        shaderCode = shaderStream.str();
-    }
-    catch (std::ifstream::failure& e)
-    {
-        throw MPMException(e.what(), Error::ShaderFileRead);
-    }
-
-    return shaderCode;
-}
-
-void Shader::Use() const
-{
-    glUseProgram(this->id);
 }
 
 void Shader::SetBool(const std::string &name, const bool value) const
@@ -112,18 +85,31 @@ void Shader::SetMat4(const std::string &name, const glm::mat4 &matrix) const
     glUniformMatrix4fv(glGetUniformLocation(this->id, name.c_str()), matrixCount, GL_FALSE, glm::value_ptr(matrix));
 }
 
-void Shader::CheckShaderError(const unsigned int shaderId) const
+std::string Shader::ReadShader(const std::string& path)
 {
-    char infoLog[Shader::errorMessageSize];
-    GLint success;
+    std::string shaderCode;
 
-    glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
+    std::ifstream shaderFile;
 
-    if (!success)
+    shaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+    try
     {
-        glGetShaderInfoLog(shaderId, Shader::errorMessageSize, nullptr, infoLog);
-        throw MPMException(infoLog, Error::ShaderCompile);
+        shaderFile.open(path);
+
+        std::stringstream shaderStream;
+        shaderStream << shaderFile.rdbuf();
+
+        shaderFile.close();
+
+        shaderCode = shaderStream.str();
     }
+    catch (std::ifstream::failure& e)
+    {
+        throw MPMException(e.what(), Error::ShaderFileRead);
+    }
+
+    return shaderCode;
 }
 
 void Shader::CheckShaderProgramError() const
@@ -137,5 +123,19 @@ void Shader::CheckShaderProgramError() const
     {
         glGetProgramInfoLog(this->id, Shader::errorMessageSize, nullptr, infoLog);
         throw MPMException(infoLog, Error::ShaderLink);
+    }
+}
+
+void Shader::CheckShaderError(const unsigned int shaderId) const
+{
+    char infoLog[Shader::errorMessageSize];
+    GLint success;
+
+    glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
+
+    if (!success)
+    {
+        glGetShaderInfoLog(shaderId, Shader::errorMessageSize, nullptr, infoLog);
+        throw MPMException(infoLog, Error::ShaderCompile);
     }
 }
