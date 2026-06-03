@@ -122,12 +122,14 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
 
     auto sourceLane = static_cast<uint32_t>(lane);
 
+    constexpr unsigned int fullWarpMask = 0xFFFFFFFF;
+
     for (int mergeSize = 2; mergeSize <= 32; mergeSize <<= 1)
     {
         for (int stride = mergeSize >> 1; stride > 0; stride >>= 1)
         {
-            const uint32_t partnerKey = __shfl_xor_sync(0xFFFFFFFF, key, stride);
-            const uint32_t partnerSourceLane = __shfl_xor_sync(0xFFFFFFFF, sourceLane, stride);
+            const uint32_t partnerKey = __shfl_xor_sync(fullWarpMask, key, stride);
+            const uint32_t partnerSourceLane = __shfl_xor_sync(fullWarpMask, sourceLane, stride);
 
             bool shouldSwap = false;
 
@@ -178,26 +180,27 @@ __global__ void WarpSortKernel(ParticleBlock* particleBlocks, const int particle
     const auto homeBlockCodeLow = static_cast<uint32_t>(homeBlockCode);
     const auto homeBlockCodeHigh = static_cast<uint32_t>(homeBlockCode >> 32);
 
-    particleBlocks[particleBlockIndex].positionX[lane] = __shfl_sync(0xFFFFFFFF, positionX, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].positionY[lane] = __shfl_sync(0xFFFFFFFF, positionY, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].positionZ[lane] = __shfl_sync(0xFFFFFFFF, positionZ, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].positionX[lane] = __shfl_sync(fullWarpMask, positionX, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].positionY[lane] = __shfl_sync(fullWarpMask, positionY, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].positionZ[lane] = __shfl_sync(fullWarpMask, positionZ, static_cast<int>(sourceLane));
 
-    particleBlocks[particleBlockIndex].velocityX[lane] = __shfl_sync(0xFFFFFFFF, velocityX, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(0xFFFFFFFF, velocityY, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(0xFFFFFFFF, velocityZ, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].velocityX[lane] = __shfl_sync(fullWarpMask, velocityX, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].velocityY[lane] = __shfl_sync(fullWarpMask, velocityY, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].velocityZ[lane] = __shfl_sync(fullWarpMask, velocityZ, static_cast<int>(sourceLane));
 
     for (int componentIndex = 0; componentIndex < 9; componentIndex++)
     {
-        particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = __shfl_sync(0xFFFFFFFF, deformationGradient[componentIndex], static_cast<int>(sourceLane));
-        particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = __shfl_sync(0xFFFFFFFF, affineMomentumMatrix[componentIndex], static_cast<int>(sourceLane));
+        particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = __shfl_sync(fullWarpMask, deformationGradient[componentIndex], static_cast<int>(sourceLane));
+        particleBlocks[particleBlockIndex].affineMomentumMatrix[componentIndex][lane] = __shfl_sync(fullWarpMask, affineMomentumMatrix[componentIndex], static_cast<int>(sourceLane));
     }
 
-    particleBlocks[particleBlockIndex].mass[lane] = __shfl_sync(0xFFFFFFFF, mass, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].volume[lane] = __shfl_sync(0xFFFFFFFF, volume, static_cast<int>(sourceLane));
-    particleBlocks[particleBlockIndex].plasticVolume[lane] = __shfl_sync(0xFFFFFFFF, plasticVolume, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].mass[lane] = __shfl_sync(fullWarpMask, mass, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].volume[lane] = __shfl_sync(fullWarpMask, volume, static_cast<int>(sourceLane));
+    particleBlocks[particleBlockIndex].plasticVolume[lane] = __shfl_sync(fullWarpMask, plasticVolume, static_cast<int>(sourceLane));
 
-    const uint32_t sortedHomeBlockCodeLow = __shfl_sync(0xFFFFFFFF, homeBlockCodeLow, static_cast<int>(sourceLane));
-    const uint32_t sortedHomeBlockCodeHigh = __shfl_sync(0xFFFFFFFF, homeBlockCodeHigh, static_cast<int>(sourceLane));
+    const uint32_t sortedHomeBlockCodeLow = __shfl_sync(fullWarpMask, homeBlockCodeLow, static_cast<int>(sourceLane));
+    const uint32_t sortedHomeBlockCodeHigh = __shfl_sync(fullWarpMask, homeBlockCodeHigh, static_cast<int>(sourceLane));
+
     particleHomeBlockCodes[particleIndex] = (static_cast<uint64_t>(sortedHomeBlockCodeHigh) << 32) | sortedHomeBlockCodeLow;
 }
 

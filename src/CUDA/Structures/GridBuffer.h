@@ -4,8 +4,8 @@
 #include "../Preparation/RegisterActiveBlocks.h"
 
 struct GridBlock {
-    float mass[nodesPerBlock];
-    float velocityX[nodesPerBlock], velocityY[nodesPerBlock], velocityZ[nodesPerBlock];
+    float mass[NODES_PER_BLOCK];
+    float velocityX[NODES_PER_BLOCK], velocityY[NODES_PER_BLOCK], velocityZ[NODES_PER_BLOCK];
 };
 
 #endif

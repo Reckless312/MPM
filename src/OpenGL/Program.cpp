@@ -192,7 +192,7 @@ void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF
     Camera::ChangeOrientationOnScene(this->window, this->activeScene);
 }
 
-void Program::ProcessInput(Simulation*& activeSimulation, Particle*& activeParticles, const std::array<Simulation*, 3> &simulations, const std::array<const MeshSDF*, 3> &boundarySDFs, const std::array<Particle*, 3> &particles, const std::array<const SnowVolume*, 3> &snowVolumes)
+void Program::ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes)
 {
     if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
@@ -206,16 +206,12 @@ void Program::ProcessInput(Simulation*& activeSimulation, Particle*& activeParti
 
     if (this->IsKeyJustPressed(GLFW_KEY_1))
     {
-        this->ChangeScene(1, *simulations[0], *boundarySDFs[0], *particles[0], *snowVolumes[0]);
-        activeSimulation = simulations[0];
-        activeParticles = particles[0];
+        this->ChangeScene(1, simulation, *boundarySDFs[0], particles, *snowVolumes[0]);
     }
 
     if (this->IsKeyJustPressed(GLFW_KEY_2))
     {
-        this->ChangeScene(2, *simulations[1], *boundarySDFs[1], *particles[1], *snowVolumes[1]);
-        activeSimulation = simulations[1];
-        activeParticles = particles[1];
+        this->ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1]);
 
         SnowSled::sledCenterZ = SnowSled::sledInitialZ;
         SnowSled::sledAccumulatedZ = 0.0f;
@@ -223,8 +219,6 @@ void Program::ProcessInput(Simulation*& activeSimulation, Particle*& activeParti
 
     if (this->IsKeyJustPressed(GLFW_KEY_3))
     {
-        this->ChangeScene(3, *simulations[2], *boundarySDFs[2], *particles[2], *snowVolumes[2]);
-        activeSimulation = simulations[2];
-        activeParticles = particles[2];
+        this->ChangeScene(3, simulation, *boundarySDFs[2], particles, *snowVolumes[2]);
     }
 }

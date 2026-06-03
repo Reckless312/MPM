@@ -112,16 +112,10 @@ int main()
     const glm::mat4 sledModelMatrix = SnowSled::GetSledModelMatrix();
     MeshSDF sledSDF = MeshBoundary::Voxelize(sled.GetTriangles(sledModelMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
 
-    Particle logoSnowfallParticles(logoSnowfall.GetInitialPositions());
-    Particle snowSledLayerParticles(snowSledLayer.GetInitialPositions());
-    Particle snowfallParticles(snowfall.GetInitialPositions());
+    Particle particles(logoSnowfall.GetInitialPositions());
 
-    Simulation logoSnowfallSimulation(logoSnowfall, logoSnowfallParticles.GetVBO());
-    Simulation snowSledLayerSimulation(snowSledLayer, snowSledLayerParticles.GetVBO());
-    Simulation snowfallSimulation(snowfall, snowfallParticles.GetVBO());
-
-    logoSnowfallSimulation.UploadMeshBoundary(logoSDF);
-    snowSledLayerSimulation.UploadMeshBoundary(sledSDF);
+    Simulation simulation(logoSnowfall, particles.GetVBO());
+    simulation.UploadMeshBoundary(logoSDF);
 
     camera.SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
 
@@ -139,11 +133,6 @@ int main()
         }
     }
 
-    Simulation* activeSimulation = &logoSnowfallSimulation;
-    Particle* activeParticles = &logoSnowfallParticles;
-
-    std::array<Simulation*, 3> simulations = { &logoSnowfallSimulation, &snowSledLayerSimulation, &snowfallSimulation };
-    std::array<Particle*, 3> particles = { &logoSnowfallParticles, &snowSledLayerParticles, &snowfallParticles };
     std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
     std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, nullptr };
 
@@ -157,12 +146,12 @@ int main()
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
-        program.ProcessInput(activeSimulation, activeParticles, simulations, boundarySDFs, particles, snowVolumes);
+        program.ProcessInput(simulation, particles, boundarySDFs, snowVolumes);
 
         camera.UpdateSpeed(program.deltaTime);
         camera.ProcessInput();
 
-        activeSimulation->SyncPositionsToVBO();
+        simulation.SyncPositionsToVBO();
 
         if (!program.IsPaused())
         {
@@ -170,10 +159,10 @@ int main()
             {
                 if (program.GetActiveScene() == 2)
                 {
-                    SnowSled::Move(activeSimulation);
+                    SnowSled::Move(&simulation);
                 }
 
-                activeSimulation->Step();
+                simulation.Step();
             }
         }
 
@@ -211,7 +200,7 @@ int main()
         ShellTexture::SetShellCameraUniforms(shellShader, camera);
 
         shellTexture.Bind(shellShader);
-        shellTexture.DrawParticles(shellShader, *activeParticles);
+        shellTexture.DrawParticles(shellShader, particles);
 
         if (!Program::recordingMode)
         {
@@ -238,7 +227,7 @@ int main()
         if (program.GetRecordingScene() == 1)
         {
             program.SetRecordingScene(2);
-            program.ChangeScene(program.GetRecordingScene(), *simulations[1], *boundarySDFs[1], *particles[1], *snowVolumes[1]);
+            program.ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1]);
 
             SnowSled::sledCenterZ = SnowSled::sledInitialZ;
             SnowSled::sledAccumulatedZ = 0.0f;

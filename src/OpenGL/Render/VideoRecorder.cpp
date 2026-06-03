@@ -82,6 +82,8 @@ void VideoRecorder::EndFrame()
 
     this->pboIndex = readIndex;
     this->frameCount++;
+
+    printf("Frame %d / %d\n", this->frameCount, this->totalFrames);
 }
 
 void VideoRecorder::BeginFrame() const

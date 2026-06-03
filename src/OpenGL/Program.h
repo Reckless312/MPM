@@ -29,7 +29,7 @@ public:
     inline static int currentWidth = 800;
     inline static int currentHeight = 600;
     inline static int recordingFrameRate = 144;
-    inline static int recordingDurationSeconds = 5;
+    inline static int recordingDurationSeconds = 10;
 
     float deltaTime = 0.0f;
 
@@ -53,7 +53,7 @@ public:
     void SetViewportAndResizeCallback() const;
     void SetSceneUniforms(const Shader& shader) const;
     void ChangeScene(int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume);
-    void ProcessInput(Simulation*& activeSimulation, Particle*& activeParticles, const std::array<Simulation*, 3> &simulations, const std::array<const MeshSDF*, 3> &boundarySDFs, const std::array<Particle*, 3> &particles, const std::array<const SnowVolume*, 3> &snowVolumes);
+    void ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes);
 private:
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 

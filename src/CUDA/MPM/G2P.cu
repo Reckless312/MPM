@@ -239,5 +239,6 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
     {
         particleBlocks[particleBlockIndex].deformationGradient[componentIndex][lane] = elasticDeformationGradient[componentIndex];
     }
+
     particleBlocks[particleBlockIndex].plasticVolume[lane] = newPlasticVolume;
 }

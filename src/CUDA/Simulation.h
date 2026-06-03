@@ -19,7 +19,6 @@ public:
     ~Simulation();
 
     void Step();
-    void Grow();
     void SyncPositionsToVBO();
     void UpdatePhysicsParams();
     void ClearMeshBoundary() const;
@@ -27,7 +26,6 @@ public:
     void Reset(const SnowVolume& snowVolume);
     void SetBoundaryVelocity(glm::vec3 velocity);
     void UploadMeshBoundary(const MeshSDF& sdf) const;
-    void AddParticles(const ParticleBlock* blocks, int additionalParticleCount);
     void UnregisterVBO();
     void RebindVBO(unsigned int vbo);
 
@@ -69,8 +67,6 @@ private:
     bool graphValid = false;
 
     int particleCount;
-    int allocatedParticleCount;
-    int minimumAllocation = 50000;
 
     void WarpSort();
     void SortParticles();
