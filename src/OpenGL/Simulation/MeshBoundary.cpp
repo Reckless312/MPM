@@ -9,113 +9,113 @@
 
 #include <glm/glm.hpp>
 
-glm::vec3 MeshBoundary::ClosestPointOnTriangle(glm::vec3 point, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
-{
-    // 7 Voronoi Regions
+#include "SimulationConfig.h"
 
-    // Vertices
+glm::vec3 MeshBoundary::ClosestPointOnTriangle(glm::vec3 p, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2)
+{
+    // I hate everything about this function and making it readable
+
     glm::vec3 e0 = v1 - v0;
     glm::vec3 e1 = v2 - v0;
-    glm::vec3 v0ToPoint = point - v0;
 
-    float v0ToPointProjectionE0 = glm::dot(e0, v0ToPoint);
-    float v0ToPointProjectionE1 = glm::dot(e1, v0ToPoint);
+    glm::vec3 v0ToP = p - v0;
 
-    if (v0ToPointProjectionE0 <= 0.0f && v0ToPointProjectionE1 <= 0.0f)
+    float d0 = glm::dot(e0, v0ToP);
+    float d1 = glm::dot(e1, v0ToP);
+
+    if (d0 <= 0.0f && d1 <= 0.0f)
     {
         return v0;
     }
 
-    glm::vec3 v1ToPoint = point - v1;
+    glm::vec3 v1ToP = p - v1;
 
-    float v1ToPointProjectionE0 = glm::dot(e0, v1ToPoint);
-    float v1ToPointProjectionE1 = glm::dot(e1, v1ToPoint);
+    float d2 = glm::dot(e0, v1ToP);
+    float d3 = glm::dot(e1, v1ToP);
 
-    if (v1ToPointProjectionE0 >= 0.0f && v1ToPointProjectionE1 <= v1ToPointProjectionE0)
+    if (d2 >= 0.0f && d3 <= d2)
     {
         return v1;
     }
 
-    glm::vec3 v2ToPoint = point - v2;
+    glm::vec3 v2ToP = p - v2;
 
-    float v2ToPointProjectionE0 = glm::dot(e0, v2ToPoint);
-    float v2ToPointProjectionE1 = glm::dot(e1, v2ToPoint);
+    float d4 = glm::dot(e0, v2ToP);
+    float d5 = glm::dot(e1, v2ToP);
 
-    if (v2ToPointProjectionE1 >= 0.0f && v2ToPointProjectionE0 <= v2ToPointProjectionE1)
+    if (d5 >= 0.0f && d4 <= d5)
     {
         return v2;
     }
 
-    // Edges
-    float unnormalizedWeightV2 = v0ToPointProjectionE0 * v1ToPointProjectionE1 - v1ToPointProjectionE0 * v0ToPointProjectionE1;
+    float o2 = d0 * d3 - d2 * d1;
 
-    if (unnormalizedWeightV2 <= 0.0f && v0ToPointProjectionE0 >= 0.0f && v1ToPointProjectionE0 <= 0.0f)
+    if (o2 <= 0.0f && d0 >= 0.0f && d2 <= 0.0f)
     {
-        float fractionAlongE0 = v0ToPointProjectionE0 / (v0ToPointProjectionE0 - v1ToPointProjectionE0);
-        return v0 + fractionAlongE0 * e0;
+        float t2 = d0 / (d0 - d2);
+        return v0 + t2 * e0;
     }
 
-    float unnormalizedWeightV1 = v2ToPointProjectionE0 * v0ToPointProjectionE1 - v0ToPointProjectionE0 * v2ToPointProjectionE1;
+    float o1 = d4 * d1 - d0 * d5;
 
-    if (unnormalizedWeightV1 <= 0.0f && v0ToPointProjectionE1 >= 0.0f && v2ToPointProjectionE1 <= 0.0f)
+    if (o1 <= 0.0f && d1 >= 0.0f && d5 <= 0.0f)
     {
-        float fractionAlongE1 = v0ToPointProjectionE1 / (v0ToPointProjectionE1 - v2ToPointProjectionE1);
-        return v0 + fractionAlongE1 * e1;
+        float t1 = d1 / (d1 - d5);
+        return v0 + t1 * e1;
     }
 
-    float unnormalizedWeightV0 = v1ToPointProjectionE0 * v2ToPointProjectionE1 - v2ToPointProjectionE0 * v1ToPointProjectionE1;
+    float o0 = d2 * d5 - d4 * d3;
 
-    if (unnormalizedWeightV0 <= 0.0f && (v1ToPointProjectionE1 - v1ToPointProjectionE0) >= 0.0f && (v2ToPointProjectionE0 - v2ToPointProjectionE1) >= 0.0f)
+    if (o0 <= 0.0f && (d3 - d2) >= 0.0f && (d4 - d5) >= 0.0f)
     {
-        float fractionAlongV1ToV2 = (v1ToPointProjectionE1 - v1ToPointProjectionE0) / ((v1ToPointProjectionE1 - v1ToPointProjectionE0) + (v2ToPointProjectionE0 - v2ToPointProjectionE1));
-        return v1 + fractionAlongV1ToV2 * (v2 - v1);
+        float t0 = (d3 - d2) / ((d3 - d2) + (d4 - d5));
+        return v1 + t0 * (v2 - v1);
     }
 
-    // Inside the triangle
-    float inverseBarycentricSum = 1.0f / (unnormalizedWeightV0 + unnormalizedWeightV1 + unnormalizedWeightV2);
+    float s = 1.0f / (o0 + o1 + o2);
 
-    float normalizedWeightV1 = unnormalizedWeightV1 * inverseBarycentricSum;
-    float normalizedWeightV2 = unnormalizedWeightV2 * inverseBarycentricSum;
+    float no1 = o1 * s;
+    float no2 = o2 * s;
 
-    return v0 + e0 * normalizedWeightV1 + e1 * normalizedWeightV2;
+    return v0 + e0 * no1 + e1 * no2;
 }
 
-MeshSDF MeshBoundary::Voxelize(const std::vector<std::vector<glm::vec3>>& triangles, const int cellCountPerAxis, const float cellSize)
+MeshSDF MeshBoundary::BuildSDF(const std::vector<std::vector<glm::vec3>>& triangles)
 {
-    const int nodeCount = cellCountPerAxis * cellCountPerAxis * cellCountPerAxis;
-    const float narrowBand = 4.0f * cellSize;
+    constexpr float narrowBand = 4.0f * SimulationConfig::cellSize;
 
     MeshSDF sdf;
-    sdf.distances.assign(nodeCount, std::numeric_limits<float>::max());
-    sdf.normals.assign(nodeCount, glm::vec3(0.0f));
+    sdf.distances.assign(SimulationConfig::nodeCount, std::numeric_limits<float>::max());
+    sdf.normals.assign(SimulationConfig::nodeCount, glm::vec3(0.0f));
 
     constexpr int mutexPoolSize = 1024;
     std::array<std::mutex, mutexPoolSize> mutexPool;
 
     const int triangleCount = static_cast<int>(triangles.size());
+
     const unsigned int threadCount = std::thread::hardware_concurrency();
     const int chunkSize = (triangleCount + static_cast<int>(threadCount) - 1) / static_cast<int>(threadCount);
 
     auto processTriangles = [&](const int start, const int end)
     {
-        for (int t = start; t < end; t++)
+        for (int currentTriangle = start; currentTriangle < end; currentTriangle++)
         {
-            const glm::vec3& v0 = triangles[t][0];
-            const glm::vec3& v1 = triangles[t][1];
-            const glm::vec3& v2 = triangles[t][2];
+            const glm::vec3& v0 = triangles[currentTriangle][0];
+            const glm::vec3& v1 = triangles[currentTriangle][1];
+            const glm::vec3& v2 = triangles[currentTriangle][2];
 
             const glm::vec3 triangleNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
 
             const glm::vec3 boundsMin = glm::min(glm::min(v0, v1), v2);
             const glm::vec3 boundsMax = glm::max(glm::max(v0, v1), v2);
 
-            const int cellXMin = std::max(0, static_cast<int>(std::floor((boundsMin.x - narrowBand) / cellSize)));
-            const int cellYMin = std::max(0, static_cast<int>(std::floor((boundsMin.y - narrowBand) / cellSize)));
-            const int cellZMin = std::max(0, static_cast<int>(std::floor((boundsMin.z - narrowBand) / cellSize)));
+            const int cellXMin = std::max(0, static_cast<int>(std::floor((boundsMin.x - narrowBand) / SimulationConfig::cellSize)));
+            const int cellYMin = std::max(0, static_cast<int>(std::floor((boundsMin.y - narrowBand) / SimulationConfig::cellSize)));
+            const int cellZMin = std::max(0, static_cast<int>(std::floor((boundsMin.z - narrowBand) / SimulationConfig::cellSize)));
 
-            const int cellXMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.x + narrowBand) / cellSize)));
-            const int cellYMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.y + narrowBand) / cellSize)));
-            const int cellZMax = std::min(cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.z + narrowBand) / cellSize)));
+            const int cellXMax = std::min(SimulationConfig::cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.x + narrowBand) / SimulationConfig::cellSize)));
+            const int cellYMax = std::min(SimulationConfig::cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.y + narrowBand) / SimulationConfig::cellSize)));
+            const int cellZMax = std::min(SimulationConfig::cellCountPerAxis - 1, static_cast<int>(std::ceil((boundsMax.z + narrowBand) / SimulationConfig::cellSize)));
 
             for (int z = cellZMin; z <= cellZMax; z++)
             {
@@ -123,9 +123,10 @@ MeshSDF MeshBoundary::Voxelize(const std::vector<std::vector<glm::vec3>>& triang
                 {
                     for (int x = cellXMin; x <= cellXMax; x++)
                     {
-                        const glm::vec3 nodePosition(static_cast<float>(x) * cellSize, static_cast<float>(y) * cellSize, static_cast<float>(z) * cellSize);
+                        const glm::vec3 nodePosition(static_cast<float>(x) * SimulationConfig::cellSize, static_cast<float>(y) * SimulationConfig::cellSize, static_cast<float>(z) * SimulationConfig::cellSize);
                         const glm::vec3 closestPoint = ClosestPointOnTriangle(nodePosition, v0, v1, v2);
                         const glm::vec3 toNode = nodePosition - closestPoint;
+
                         const float distance = glm::length(toNode);
 
                         if (distance >= narrowBand)
@@ -133,16 +134,25 @@ MeshSDF MeshBoundary::Voxelize(const std::vector<std::vector<glm::vec3>>& triang
                             continue;
                         }
 
-                        const int index = z * cellCountPerAxis * cellCountPerAxis + y * cellCountPerAxis + x;
+                        const int index = z * SimulationConfig::cellCountPerAxis * SimulationConfig::cellCountPerAxis + y * SimulationConfig::cellCountPerAxis + x;
 
                         std::lock_guard lock(mutexPool[index % mutexPoolSize]);
 
-                        if (distance < std::abs(sdf.distances[index]))
+                        if (distance >= std::abs(sdf.distances[index]))
                         {
-                            const float sign = glm::dot(toNode, triangleNormal) >= 0.0f ? 1.0f : -1.0f;
-                            sdf.distances[index] = sign * distance;
-                            sdf.normals[index] = triangleNormal;
+                            continue;
                         }
+
+                        if (glm::dot(toNode, triangleNormal) >= 0.0f)
+                        {
+                            sdf.distances[index] = distance;
+                        }
+                        else
+                        {
+                            sdf.distances[index] = -distance;
+                        }
+
+                        sdf.normals[index] = triangleNormal;
                     }
                 }
             }
@@ -152,9 +162,9 @@ MeshSDF MeshBoundary::Voxelize(const std::vector<std::vector<glm::vec3>>& triang
     std::vector<std::thread> threads;
     threads.reserve(threadCount);
 
-    for (unsigned int i = 0; i < threadCount; i++)
+    for (unsigned int thread = 0; thread < threadCount; thread++)
     {
-        const int start = static_cast<int>(i) * chunkSize;
+        const int start = static_cast<int>(thread) * chunkSize;
         const int end = std::min(start + chunkSize, triangleCount);
 
         if (start < triangleCount)

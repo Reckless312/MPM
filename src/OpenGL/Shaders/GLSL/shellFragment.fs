@@ -54,9 +54,9 @@ void main()
     const float ambientStrength = 0.4;
     float lightIntensity = ambientStrength + (1.0 - ambientStrength) * diffuse;
 
-    const float shellDepthMin = 0.85;
-    const float shellDepthRange = 0.15;
-    float depthFactor = shellDepthMin + shellDepthRange * float(currentShell) / float(totalShells - 1);
+    const float shellBrightnessMin = 0.85;
+    const float shellBrightnessRange = 0.15;
+    float brightnessFactor = shellBrightnessMin + shellBrightnessRange * float(currentShell) / float(totalShells - 1);
 
     vec3 encodedNormal = texture(shellSpecularTextures, textureCoordinates).xyz;
     vec3 crystalNormal = normalize(encodedNormal * 2.0 - 1.0);
@@ -70,7 +70,7 @@ void main()
 
     const vec3 snowShadowColor = vec3(0.45, 0.60, 0.80);
     const vec3 snowLitColor = vec3(1.0, 1.0, 1.0);
-    vec3 result = mix(snowShadowColor, snowLitColor, lightIntensity) * depthFactor + vec3(glitterIntensity * glitterStrength);
+    vec3 result = mix(snowShadowColor, snowLitColor, lightIntensity) * brightnessFactor + vec3(glitterIntensity * glitterStrength);
 
     FragmentColor = vec4(result, 1.0);
 }

@@ -65,7 +65,7 @@ std::vector<Texture> Model::loadMaterialTextures(const aiMaterial *material, con
 
         bool skip = false;
 
-        for (auto & loadedTexture : this->loadedTextures)
+        for (auto& loadedTexture : this->loadedTextures)
         {
             if (std::strcmp(loadedTexture.path.data(), localPath.C_Str()) == 0)
             {
@@ -106,13 +106,13 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
         informationBuffer.y = mesh->mVertices[vertexIndex].y;
         informationBuffer.z = mesh->mVertices[vertexIndex].z;
 
-        vertex.Position = informationBuffer;
+        vertex.position = informationBuffer;
 
         informationBuffer.x = mesh->mNormals[vertexIndex].x;
         informationBuffer.y = mesh->mNormals[vertexIndex].y;
         informationBuffer.z = mesh->mNormals[vertexIndex].z;
 
-        vertex.Normal = informationBuffer;
+        vertex.normal = informationBuffer;
 
         if (mesh->mTextureCoords[0])
         {
@@ -121,11 +121,11 @@ void Model::processMesh(aiMesh *mesh, const aiScene *scene)
             textureCoordinates.x = mesh->mTextureCoords[0][vertexIndex].x;
             textureCoordinates.y = mesh->mTextureCoords[0][vertexIndex].y;
 
-            vertex.TextureCoordinates = textureCoordinates;
+            vertex.textureCoordinates = textureCoordinates;
         }
         else
         {
-            vertex.TextureCoordinates = glm::vec2(0.0f, 0.0f);
+            vertex.textureCoordinates = glm::vec2(0.0f, 0.0f);
         }
 
         vertices.push_back(vertex);

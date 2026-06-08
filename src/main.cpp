@@ -107,10 +107,10 @@ int main()
     }
 
     const glm::mat4 logoModelMatrix = LogoSnowfall::GetLogoModelMatrix();
-    MeshSDF logoSDF = MeshBoundary::Voxelize(logoUBB.GetTriangles(logoModelMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
+    MeshSDF logoSDF = MeshBoundary::BuildSDF(logoUBB.GetTriangles(logoModelMatrix));
 
     const glm::mat4 sledModelMatrix = SnowSled::GetSledModelMatrix();
-    MeshSDF sledSDF = MeshBoundary::Voxelize(sled.GetTriangles(sledModelMatrix), SimulationConfig::cellCountPerAxis, SimulationConfig::cellSize);
+    MeshSDF sledSDF = MeshBoundary::BuildSDF(sled.GetTriangles(sledModelMatrix));
 
     Particle particles(logoSnowfall.GetInitialPositions());
 

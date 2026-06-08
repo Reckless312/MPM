@@ -53,7 +53,7 @@ std::vector<std::vector<glm::vec3>> Mesh::GetTriangles() const
 
     for (size_t currentIndex = 0; currentIndex < this->indices.size(); currentIndex += 3)
     {
-        triangles.push_back({this->vertices[this->indices[currentIndex]].Position, this->vertices[this->indices[currentIndex + 1]].Position, this->vertices[this->indices[currentIndex + 2]].Position});
+        triangles.push_back({this->vertices[this->indices[currentIndex]].position, this->vertices[this->indices[currentIndex + 1]].position, this->vertices[this->indices[currentIndex + 2]].position});
     }
 
     return triangles;
@@ -126,10 +126,10 @@ void Mesh::setupMesh()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), static_cast<void *>(nullptr));
 
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, Normal)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, normal)));
 
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, TextureCoordinates)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(offsetof(Vertex, textureCoordinates)));
 
     glBindVertexArray(0);
 }

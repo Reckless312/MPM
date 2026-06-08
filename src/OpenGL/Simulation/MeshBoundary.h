@@ -14,10 +14,10 @@ struct MeshSDF
 class MeshBoundary
 {
 public:
-    static MeshSDF Voxelize(const std::vector<std::vector<glm::vec3>>& triangles, int cellCountPerAxis, float cellSize);
+    static MeshSDF BuildSDF(const std::vector<std::vector<glm::vec3>>& triangles);
 
 private:
-    static glm::vec3 ClosestPointOnTriangle(glm::vec3 point, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
+    static glm::vec3 ClosestPointOnTriangle(glm::vec3 p, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
 };
 
 #endif
