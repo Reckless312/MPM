@@ -220,9 +220,12 @@ __global__ void G2PKernel(ParticleBlock* particleBlocks, const GridBlock* gridBl
         atomicExch(rebuildFlag, 1u);
     }
 
-    particleBlocks[particleBlockIndex].positionX[lane] = newPositionX;
-    particleBlocks[particleBlockIndex].positionY[lane] = newPositionY;
-    particleBlocks[particleBlockIndex].positionZ[lane] = newPositionZ;
+    const float gridMin = 2.0f * simulationParameters.cellSize;
+    const float gridMax = static_cast<float>(simulationParameters.cellCountPerAxis - 2) * simulationParameters.cellSize;
+
+    particleBlocks[particleBlockIndex].positionX[lane] = fmaxf(gridMin, fminf(gridMax, newPositionX));
+    particleBlocks[particleBlockIndex].positionY[lane] = fmaxf(gridMin, fminf(gridMax, newPositionY));
+    particleBlocks[particleBlockIndex].positionZ[lane] = fmaxf(gridMin, fminf(gridMax, newPositionZ));
 
     particleBlocks[particleBlockIndex].velocityX[lane] = newVelocityX;
     particleBlocks[particleBlockIndex].velocityY[lane] = newVelocityY;
