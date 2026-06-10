@@ -23,6 +23,9 @@
 #include "OpenGL/Scene/SnowSled.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/SnowVolume.h"
+#include <imgui/imgui.h>
+#include <imgui/imgui_impl_glfw.h>
+#include <imgui/imgui_impl_opengl3.h>
 
 int main()
 {
@@ -38,6 +41,12 @@ int main()
     {
         return Program::ReportErrorAndTerminate(exception);
     }
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::GetIO().Fonts->AddFontDefault()->Scale = 2.0f;
+    ImGui_ImplGlfw_InitForOpenGL(program.window, false);
+    ImGui_ImplOpenGL3_Init("#version 330");
 
     program.LockCursor();
     program.SetViewportAndResizeCallback();
@@ -222,6 +231,18 @@ int main()
 
         if (!Program::recordingMode)
         {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
+            ImGui::Begin("Info");
+            ImGui::Text("FPS: %.1f", 1.0f / program.deltaTime);
+            ImGui::End();
+
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
             glfwSwapBuffers(program.window);
             glfwPollEvents();
             continue;
@@ -264,6 +285,10 @@ int main()
             break;
         }
     }
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     return 0;
 }

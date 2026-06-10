@@ -5,7 +5,14 @@ find_package(CUDAToolkit REQUIRED)
 
 set(CMAKE_CUDA_STANDARD 20)
 
-set(SOURCE_FILES src/Libraries/glad.c src/main.cpp
+set(SOURCE_FILES src/Libraries/glad.c
+        src/Libraries/imgui.cpp
+        src/Libraries/imgui_draw.cpp
+        src/Libraries/imgui_impl_glfw.cpp
+        src/Libraries/imgui_impl_opengl3.cpp
+        src/Libraries/imgui_tables.cpp
+        src/Libraries/imgui_widgets.cpp
+        src/main.cpp
         src/OpenGL/Shaders/Shader.cpp
         src/OpenGL/Shaders/Shader.h
         src/OpenGL/Program.cpp
@@ -70,7 +77,7 @@ set_target_properties(MPM_Method PROPERTIES
 
 target_compile_options(MPM_Method PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-use_fast_math>)
 
-target_include_directories(MPM_Method PUBLIC src src/Libraries/include ${CUDAToolkit_INCLUDE_DIRS})
+target_include_directories(MPM_Method PUBLIC src src/Libraries/include src/Libraries/include/imgui ${CUDAToolkit_INCLUDE_DIRS})
 
 target_compile_definitions(MPM_Method PRIVATE
         ASSETS_PATH="${CMAKE_SOURCE_DIR}/src/Assets"
