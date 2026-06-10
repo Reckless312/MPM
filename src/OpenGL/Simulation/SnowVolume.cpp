@@ -5,6 +5,7 @@
 
 #include "Exceptions/Error.h"
 #include "Exceptions/MPMException.h"
+#include "SimulationConfig.h"
 
 SnowVolume::SnowVolume(const glm::vec3 lowerLeftBoxCorner, const glm::vec3 upperRightBoxCorner, const int particleCount, const float snowDensity)
 {
@@ -31,10 +32,7 @@ int SnowVolume::GetParticleCount() const
 
 void SnowVolume::BuildInitialPositions()
 {
-    const glm::vec3 boxDiagonal = this->upperRightBoxCorner - this->lowerLeftBoxCorner;
-    const float boxVolume = boxDiagonal.x * boxDiagonal.y * boxDiagonal.z;
-
-    this->particleVolume = boxVolume / static_cast<float>(this->particleCount);
+    this->particleVolume = SimulationConfig::cellSize * SimulationConfig::cellSize * SimulationConfig::cellSize;
     this->particleMass = this->snowDensity * this->particleVolume;
 
     std::random_device randomDevice;

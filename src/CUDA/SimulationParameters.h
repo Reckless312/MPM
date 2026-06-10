@@ -13,7 +13,7 @@ struct SimulationParameters
     float criticalCompression;
     float criticalStretch;
     float boundaryFriction;
-    int gridSizeInCells;
+    int cellCountPerAxis;
     int maxBlocks;
     int cellBits;
     glm::vec3 boundaryVelocity;

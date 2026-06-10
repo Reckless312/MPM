@@ -134,7 +134,7 @@ int main()
     }
 
     std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
-    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, nullptr };
+    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &sledSDF };
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -151,8 +151,6 @@ int main()
         camera.UpdateSpeed(program.deltaTime);
         camera.ProcessInput();
 
-        simulation.SyncPositionsToVBO();
-
         if (!program.IsPaused())
         {
             for (int step = 0; step < SimulationConfig::simulationSubsteps; step++)
@@ -165,6 +163,8 @@ int main()
                 simulation.Step();
             }
         }
+
+        simulation.SyncPositionsToVBO();
 
         if (Program::recordingMode)
         {

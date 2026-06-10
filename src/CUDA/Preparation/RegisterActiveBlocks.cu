@@ -33,13 +33,34 @@ __global__ void RegisterActiveBlocks(const ParticleBlock* particleBlocks, const 
     const int blockY = cellY / blockSize;
     const int blockZ = cellZ / blockSize;
 
+    const int gridSizeInBlocks = simulationParameters.cellCountPerAxis / blockSize;
+
     for (int offsetX = -1; offsetX <= 1; offsetX++)
     {
         for (int offsetY = -1; offsetY <= 1; offsetY++)
         {
             for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
             {
-                const uint64_t neighborBlockCode = MortonEncode(blockX + offsetX, blockY + offsetY, blockZ + offsetZ);
+                const int neighborBlockX = blockX + offsetX;
+                const int neighborBlockY = blockY + offsetY;
+                const int neighborBlockZ = blockZ + offsetZ;
+
+                if (neighborBlockX < 0 || neighborBlockX >= gridSizeInBlocks)
+                {
+                    continue;
+                }
+
+                if (neighborBlockY < 0 || neighborBlockY >= gridSizeInBlocks)
+                {
+                    continue;
+                }
+
+                if (neighborBlockZ < 0 || neighborBlockZ >= gridSizeInBlocks)
+                {
+                    continue;
+                }
+
+                const uint64_t neighborBlockCode = MortonEncode(neighborBlockX, neighborBlockY, neighborBlockZ);
                 Insert(blockCodeToIndex, neighborBlockCode, nextBlockIndex, blockCodes);
             }
         }

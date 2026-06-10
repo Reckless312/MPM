@@ -46,10 +46,10 @@ namespace SimulationConfig
                 SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f, 0.8f);
                 break;
             case 2:
-                SimulationConfig::UpdateParameters(1.5e4f, 2.5e4f, 3.0f, 0.025f, 0.0075f, 0.3f);
+                SimulationConfig::UpdateParameters(0.75e4f, 1.25e4f, 1.5f, 0.025f, 0.0075f, 0.3f);
                 break;
             case 3:
-                SimulationConfig::UpdateParameters(3.889e4f, 5.833e4f, 10.0f, 0.025f, 0.0075f, 0.8f);
+                SimulationConfig::UpdateParameters(1.333e4f, 2.0e4f, 1.0f, 0.005f, 0.0075f, 0.8f);
                 break;
             default:
                 std::cout << "Invalid scene number! No change was done.";

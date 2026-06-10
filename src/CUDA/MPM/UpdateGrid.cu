@@ -37,12 +37,8 @@ __global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCod
 
     const float tangentialScale = 1.0f - simulationParameters.boundaryFriction;
 
-    EnforceWallBoundary(velocityX, velocityY, velocityZ, nodeGridX, simulationParameters.gridSizeInCells, tangentialScale);
-    EnforceWallBoundary(velocityY, velocityX, velocityZ, nodeGridY, simulationParameters.gridSizeInCells, tangentialScale);
-    EnforceWallBoundary(velocityZ, velocityX, velocityY, nodeGridZ, simulationParameters.gridSizeInCells, tangentialScale);
-
     // ReSharper disable once CppTooWideScopeInitStatement
-    const int sdfIndex = nodeGridZ * simulationParameters.gridSizeInCells * simulationParameters.gridSizeInCells + nodeGridY * simulationParameters.gridSizeInCells + nodeGridX;
+    const int sdfIndex = nodeGridZ * simulationParameters.cellCountPerAxis * simulationParameters.cellCountPerAxis + nodeGridY * simulationParameters.cellCountPerAxis + nodeGridX;
 
     if (sdfDistances[sdfIndex] < simulationParameters.cellSize)
     {
@@ -66,6 +62,10 @@ __global__ void UpdateGridKernel(GridBlock* gridBlocks, const uint64_t* blockCod
             velocityZ = tangentialVelocityZ + simulationParameters.boundaryVelocity.z;
         }
     }
+
+    EnforceWallBoundary(velocityX, velocityY, velocityZ, nodeGridX, simulationParameters.cellCountPerAxis, tangentialScale);
+    EnforceWallBoundary(velocityY, velocityX, velocityZ, nodeGridY, simulationParameters.cellCountPerAxis, tangentialScale);
+    EnforceWallBoundary(velocityZ, velocityX, velocityY, nodeGridZ, simulationParameters.cellCountPerAxis, tangentialScale);
 
     gridBlocks[gridBlockIndex].velocityX[nodeLane] = velocityX;
     gridBlocks[gridBlockIndex].velocityY[nodeLane] = velocityY;
