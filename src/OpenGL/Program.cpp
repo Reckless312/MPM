@@ -96,6 +96,11 @@ bool Program::IsPaused() const
     return this->paused;
 }
 
+bool Program::IsInfoVisible() const
+{
+    return this->showInfo;
+}
+
 int Program::GetActiveScene() const
 {
     return this->activeScene;
@@ -197,9 +202,11 @@ void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF
     simulation.UploadMeshBoundary(boundarySDF);
     simulation.SetBoundaryVelocity(nullifyVelocity);
     particles.ResizeVBO(maxCapacity);
-    simulation.Reset(snowVolume, maxCapacity);
 
+    simulation.Reset(snowVolume, maxCapacity);
     simulation.RebindVBO(particles.GetVBO());
+
+    particles.SetCount(simulation.GetParticleCount());
 
     Camera::ChangeOrientationOnScene(this->window, this->activeScene);
 }
@@ -214,6 +221,11 @@ void Program::ProcessInput(Simulation& simulation, Particle& particles, const st
     if (this->IsKeyJustPressed(GLFW_KEY_SPACE))
     {
         this->paused = !this->paused;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_TAB))
+    {
+        this->showInfo = !this->showInfo;
     }
 
     if (this->IsKeyJustPressed(GLFW_KEY_1))

@@ -47,6 +47,7 @@ public:
 
     [[nodiscard]] bool IsKeyJustPressed(int key);
     [[nodiscard]] bool IsPaused() const;
+    [[nodiscard]] bool IsInfoVisible() const;
 
     [[nodiscard]] int GetActiveScene() const;
     [[nodiscard]] int GetRecordingScene() const;
@@ -76,6 +77,7 @@ private:
     static constexpr int profile = GLFW_OPENGL_CORE_PROFILE;
 
     bool paused = false;
+    bool showInfo = true;
 
     float lastFrame = 0.0f;
 

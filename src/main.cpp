@@ -44,7 +44,7 @@ int main()
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui::GetIO().Fonts->AddFontDefault()->Scale = 2.0f;
+    ImGui::GetIO().Fonts->AddFontDefault()->Scale = 1.5f;
     ImGui_ImplGlfw_InitForOpenGL(program.window, false);
     ImGui_ImplOpenGL3_Init("#version 330");
 
@@ -235,10 +235,20 @@ int main()
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
-            ImGui::Begin("Info");
-            ImGui::Text("FPS: %.1f", 1.0f / program.deltaTime);
-            ImGui::End();
+            if (program.IsInfoVisible())
+            {
+                ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
+                ImGui::Begin("Info");
+                ImGui::Text("FPS: %.1f", 1.0f / program.deltaTime);
+                ImGui::Separator();
+                ImGui::Text("1: Logo Scene");
+                ImGui::Text("2: Sled Scene");
+                ImGui::Text("3: Snowfall Scene");
+                ImGui::Text("Space: Pause");
+                ImGui::Text("Tab: Hide");
+                ImGui::Text("Esc: Quit");
+                ImGui::End();
+            }
 
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
