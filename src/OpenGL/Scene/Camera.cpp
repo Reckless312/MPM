@@ -1,8 +1,10 @@
 #include "Camera.h"
 
+#include <cstdio>
 #include <glm/gtc/quaternion.hpp>
 
 #include "LogoSnowfall.h"
+#include "Snowfall.h"
 #include "SnowSled.h"
 #include "Exceptions/MPMException.h"
 
@@ -51,6 +53,10 @@ void Camera::ChangeOrientationOnScene(GLFWwindow *window, const int scene)
         else if (scene == 2)
         {
             camera->SetInitialOrientation(SnowSled::cameraPosition, SnowSled::cameraYaw, SnowSled::cameraPitch);
+        }
+        else if (scene == 3)
+        {
+            camera->SetInitialOrientation(Snowfall::cameraPosition, Snowfall::cameraYaw, Snowfall::cameraPitch);
         }
     }
     else
@@ -154,6 +160,8 @@ void Camera::UpdateDirection()
 void Camera::UpdateViewMatrix()
 {
     this->viewMatrix = glm::lookAt(this->position, this->position + this->front, this->up);
+    printf("\rpos(%.2f, %.2f, %.2f)  yaw=%.1f  pitch=%.1f     ", this->position.x, this->position.y, this->position.z, this->yaw, this->pitch);
+    fflush(stdout);
 }
 
 void Camera::UpdateRightVector()

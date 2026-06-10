@@ -62,12 +62,14 @@ int main()
 
     Model logoUBB("/Logo/ubb_logo.obj");
     Model sled("/Sled/sled.obj");
+    Model doom("/Doom/doom.obj");
     Model floorModel("/Floor/floor.obj");
 
     try
     {
         logoUBB.loadModel();
         sled.loadModel();
+        doom.loadModel();
         floorModel.loadModel();
     }
     catch (const MPMException& exception)
@@ -88,7 +90,7 @@ int main()
 
     SnowVolume logoSnowfall(LogoSnowfall::boxLeftCorner, LogoSnowfall::boxRightCorner, LogoSnowfall::particleCount, LogoSnowfall::snowDensity);
     SnowVolume snowSledLayer(SnowSled::boxLeftCorner, SnowSled::boxRightCorner, SnowSled::particleCount, SnowSled::snowDensity);
-    SnowVolume snowfall(Snowfall::boxLeftCorner, Snowfall::boxRightCorner, Snowfall::particleCount, Snowfall::snowDensity);
+    SnowVolume snowfall(Snowfall::boxLeftCorner, Snowfall::boxRightCorner, Snowfall::particleBatchCount, Snowfall::snowDensity);
 
     try
     {
@@ -112,9 +114,11 @@ int main()
     const glm::mat4 sledModelMatrix = SnowSled::GetSledModelMatrix();
     MeshSDF sledSDF = MeshBoundary::BuildSDF(sled.GetTriangles(sledModelMatrix));
 
+    MeshSDF doomSDF = MeshBoundary::BuildSDF(doom.GetTriangles(Snowfall::GetDoomModelMatrix()));
+
     Particle particles(logoSnowfall.GetInitialPositions());
 
-    Simulation simulation(logoSnowfall, particles.GetVBO());
+    Simulation simulation(logoSnowfall, particles.GetVBO(), logoSnowfall.GetParticleCount());
     simulation.UploadMeshBoundary(logoSDF);
 
     camera.SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
@@ -134,7 +138,8 @@ int main()
     }
 
     std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
-    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &sledSDF };
+    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &doomSDF };
+    std::array maxCapacities = { LogoSnowfall::particleCount, SnowSled::particleCount, Snowfall::maxParticleCount };
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -146,13 +151,25 @@ int main()
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
-        program.ProcessInput(simulation, particles, boundarySDFs, snowVolumes);
+        program.ProcessInput(simulation, particles, boundarySDFs, snowVolumes, maxCapacities);
 
         camera.UpdateSpeed(program.deltaTime);
         camera.ProcessInput();
 
         if (!program.IsPaused())
         {
+            if (program.GetActiveScene() == 3 && simulation.GetParticleCount() < Snowfall::maxParticleCount)
+            {
+                try
+                {
+                    Snowfall::SpawnIfPossible(&simulation, &particles);
+                }
+                catch (const MPMException& exception)
+                {
+                    return Program::ReportErrorAndTerminate(exception);
+                }
+            }
+
             for (int step = 0; step < SimulationConfig::simulationSubsteps; step++)
             {
                 if (program.GetActiveScene() == 2)
@@ -193,7 +210,8 @@ int main()
 
         if (program.GetActiveScene() == 3)
         {
-
+            Snowfall::SetDoomUniforms(sceneShader);
+            doom.Draw(sceneShader);
         }
 
         shellShader.Use();
@@ -224,23 +242,21 @@ int main()
             continue;
         }
 
-        if (program.GetRecordingScene() == 1)
+        if (program.GetRecordingScene() < 3)
         {
-            program.SetRecordingScene(2);
-            program.ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1]);
-
-            SnowSled::sledCenterZ = SnowSled::sledInitialZ;
-            SnowSled::sledAccumulatedZ = 0.0f;
-
-            recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
-
             try
             {
-                recorder->Open(Program::sledSceneOutputPath);
+                program.AdvanceRecordingScene(simulation, particles, boundarySDFs, snowVolumes, maxCapacities, recorder);
             }
             catch (const MPMException& exception)
             {
                 return Program::ReportErrorAndTerminate(exception);
+            }
+
+            if (program.GetRecordingScene() == 2)
+            {
+                SnowSled::sledCenterZ = SnowSled::sledInitialZ;
+                SnowSled::sledAccumulatedZ = 0.0f;
             }
         }
         else

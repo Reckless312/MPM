@@ -46,3 +46,8 @@ void Particle::ResizeVBO(const int newCount)
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
+
+void Particle::SetCount(const int newCount)
+{
+    this->count = newCount;
+}

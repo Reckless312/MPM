@@ -5,6 +5,7 @@
 #include "Program.h"
 #include "OpenGL/Scene/Camera.h"
 #include "Scene/SnowSled.h"
+#include "Scene/Snowfall.h"
 #include "Simulation/SimulationConfig.h"
 
 Program::Program()
@@ -171,7 +172,18 @@ void Program::SetSceneUniforms(const Shader& shader) const
     }
 }
 
-void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume)
+void Program::AdvanceRecordingScene(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes, const std::array<int, 3>& maxCapacities, std::unique_ptr<VideoRecorder>& recorder)
+{
+    const int nextScene = this->recordingScene + 1;
+    this->SetRecordingScene(nextScene);
+
+    this->ChangeScene(nextScene, simulation, *boundarySDFs[nextScene - 1], particles, *snowVolumes[nextScene - 1], maxCapacities[nextScene - 1]);
+
+    recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
+    recorder->Open(Program::sceneOutputPaths[nextScene - 1]);
+}
+
+void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume, const int maxCapacity)
 {
     simulation.UnregisterVBO();
 
@@ -184,15 +196,15 @@ void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF
     simulation.UpdatePhysicsParams();
     simulation.UploadMeshBoundary(boundarySDF);
     simulation.SetBoundaryVelocity(nullifyVelocity);
-    particles.ResizeVBO(snowVolume.GetParticleCount());
-    simulation.Reset(snowVolume);
+    particles.ResizeVBO(maxCapacity);
+    simulation.Reset(snowVolume, maxCapacity);
 
     simulation.RebindVBO(particles.GetVBO());
 
     Camera::ChangeOrientationOnScene(this->window, this->activeScene);
 }
 
-void Program::ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes)
+void Program::ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes, const std::array<int, 3>& maxCapacities)
 {
     if (glfwGetKey(this->window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
@@ -206,12 +218,12 @@ void Program::ProcessInput(Simulation& simulation, Particle& particles, const st
 
     if (this->IsKeyJustPressed(GLFW_KEY_1))
     {
-        this->ChangeScene(1, simulation, *boundarySDFs[0], particles, *snowVolumes[0]);
+        this->ChangeScene(1, simulation, *boundarySDFs[0], particles, *snowVolumes[0], maxCapacities[0]);
     }
 
     if (this->IsKeyJustPressed(GLFW_KEY_2))
     {
-        this->ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1]);
+        this->ChangeScene(2, simulation, *boundarySDFs[1], particles, *snowVolumes[1], maxCapacities[1]);
 
         SnowSled::sledCenterZ = SnowSled::sledInitialZ;
         SnowSled::sledAccumulatedZ = 0.0f;
@@ -219,6 +231,8 @@ void Program::ProcessInput(Simulation& simulation, Particle& particles, const st
 
     if (this->IsKeyJustPressed(GLFW_KEY_3))
     {
-        this->ChangeScene(3, simulation, *boundarySDFs[2], particles, *snowVolumes[2]);
+        this->ChangeScene(3, simulation, *boundarySDFs[2], particles, *snowVolumes[2], maxCapacities[2]);
+
+        Snowfall::spawnFrameCounter = 0;
     }
 }

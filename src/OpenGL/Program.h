@@ -3,6 +3,7 @@
 
 #include <array>
 #include <map>
+#include <memory>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -12,6 +13,7 @@
 #include "Render/Particle.h"
 #include "Simulation/MeshBoundary.h"
 #include "Simulation/SnowVolume.h"
+#include "Render/VideoRecorder.h"
 
 class Program
 {
@@ -23,6 +25,9 @@ public:
 
     inline static const char* logoSceneOutputPath = "/home/cora/Videos/logo_scene.mp4";
     inline static const char* sledSceneOutputPath = "/home/cora/Videos/sled_scene.mp4";
+    inline static const char* snowfallSceneOutputPath = "/home/cora/Videos/snowfall_scene.mp4";
+
+    inline static const std::array<const char*, 3> sceneOutputPaths = { logoSceneOutputPath, sledSceneOutputPath, snowfallSceneOutputPath };
 
     inline static bool recordingMode = false;
 
@@ -52,8 +57,9 @@ public:
     void CreateWindowAndAssignContext();
     void SetViewportAndResizeCallback() const;
     void SetSceneUniforms(const Shader& shader) const;
-    void ChangeScene(int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume);
-    void ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes);
+    void ChangeScene(int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume, int maxCapacity);
+    void AdvanceRecordingScene(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes, const std::array<int, 3>& maxCapacities, std::unique_ptr<VideoRecorder>& recorder);
+    void ProcessInput(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes, const std::array<int, 3>& maxCapacities);
 private:
     static constexpr GLFWwindow* windowToShareResources = nullptr;
 

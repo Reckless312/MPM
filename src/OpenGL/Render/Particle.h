@@ -16,6 +16,7 @@ public:
 
     void Draw() const;
     void ResizeVBO(int newCount);
+    void SetCount(int newCount);
 
 private:
     unsigned int VAO{}, VBO{};

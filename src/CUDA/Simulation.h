@@ -15,7 +15,7 @@
 class Simulation
 {
 public:
-    Simulation(const SnowVolume& snowVolume, unsigned int vbo);
+    Simulation(const SnowVolume& snowVolume, unsigned int vbo, int maxCapacity);
     ~Simulation();
 
     void Step();
@@ -23,7 +23,9 @@ public:
     void UpdatePhysicsParams();
     void ClearMeshBoundary() const;
     void MoveSledSDF(int movedCells) const;
-    void Reset(const SnowVolume& snowVolume);
+    void Reset(const SnowVolume& snowVolume, int newMaxCapacity);
+    void AddParticles(const SnowVolume& snowVolume);
+    [[nodiscard]] int GetParticleCount() const;
     void SetBoundaryVelocity(glm::vec3 velocity);
     void UploadMeshBoundary(const MeshSDF& sdf) const;
     void UnregisterVBO();
@@ -67,6 +69,7 @@ private:
     bool graphValid = false;
 
     int particleCount;
+    int maxCapacity;
 
     void WarpSort();
     void SortParticles();

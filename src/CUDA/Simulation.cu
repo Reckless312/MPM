@@ -18,14 +18,15 @@
 
 __constant__ SimulationParameters simulationParameters;
 
-Simulation::Simulation(const SnowVolume& snowVolume, const unsigned int vbo)
+Simulation::Simulation(const SnowVolume& snowVolume, const unsigned int vbo, const int maxCapacity)
 {
     this->particleCount = snowVolume.GetParticleCount();
+    this->maxCapacity = maxCapacity;
 
-    CUDA_CHECK(cudaMalloc(&this->particleBlocks, Simulation::ParticlesToBlocks(this->particleCount) * sizeof(ParticleBlock)));
+    CUDA_CHECK(cudaMalloc(&this->particleBlocks, Simulation::ParticlesToBlocks(this->maxCapacity) * sizeof(ParticleBlock)));
     CUDA_CHECK(cudaMemcpy(this->particleBlocks, snowVolume.GetInitialBlocks().data(), snowVolume.GetInitialBlocks().size() * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
 
-    this->AllocateParticleBuffers(this->particleCount);
+    this->AllocateParticleBuffers(this->maxCapacity);
 
     CUDA_CHECK(cudaMemset(this->particleHomeBlockCodes, 0xFF, this->particleCount * sizeof(uint64_t)));
 
@@ -183,6 +184,22 @@ void Simulation::UpdatePhysicsParams()
     this->UploadSimParams();
 }
 
+int Simulation::GetParticleCount() const
+{
+    return this->particleCount;
+}
+
+void Simulation::AddParticles(const SnowVolume& snowVolume)
+{
+    const int offset = Simulation::ParticlesToBlocks(this->particleCount);
+    const std::vector<ParticleBlock>& blocks = snowVolume.GetInitialBlocks();
+
+    CUDA_CHECK(cudaMemcpy(this->particleBlocks + offset, blocks.data(), blocks.size() * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
+
+    this->particleCount += snowVolume.GetParticleCount();
+    this->SetRebuildFlag();
+}
+
 void Simulation::ClearMeshBoundary() const
 {
     CUDA_CHECK(cudaMemset(this->sdfDistances, 0x7F, SimulationConfig::nodeCount * sizeof(float)));
@@ -199,25 +216,25 @@ void Simulation::MoveSledSDF(const int movedCells) const
     CUDA_CHECK(cudaDeviceSynchronize());
 }
 
-void Simulation::Reset(const SnowVolume& snowVolume)
+void Simulation::Reset(const SnowVolume& snowVolume, const int newMaxCapacity)
 {
     CUDA_CHECK(cudaStreamSynchronize(this->simulationStream));
 
     this->DestroyGraphIfValid();
-    // ReSharper disable once CppTooWideScopeInitStatement
-    const int newParticleCount = snowVolume.GetParticleCount();
 
-    if (newParticleCount != this->particleCount)
+    if (newMaxCapacity > this->maxCapacity)
     {
         cudaFree(this->particleBlocks);
         this->FreeParticleBuffers();
 
-        this->particleCount = newParticleCount;
+        this->maxCapacity = newMaxCapacity;
 
-        CUDA_CHECK(cudaMalloc(&this->particleBlocks, Simulation::ParticlesToBlocks(this->particleCount) * sizeof(ParticleBlock)));
+        CUDA_CHECK(cudaMalloc(&this->particleBlocks, Simulation::ParticlesToBlocks(this->maxCapacity) * sizeof(ParticleBlock)));
         this->nvidiaCUBTemporaryStorageBytes = 0;
-        this->AllocateParticleBuffers(this->particleCount);
+        this->AllocateParticleBuffers(this->maxCapacity);
     }
+
+    this->particleCount = snowVolume.GetParticleCount();
 
     CUDA_CHECK(cudaMemcpy(this->particleBlocks, snowVolume.GetInitialBlocks().data(), snowVolume.GetInitialBlocks().size() * sizeof(ParticleBlock), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemset(this->blockCodeToIndex.keys, 0xFF, SimulationConfig::maxBlocks * sizeof(uint64_t)));
