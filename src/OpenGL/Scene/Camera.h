@@ -24,6 +24,7 @@ public:
     void UpdateProjectionMatrix();
     void UpdateSpeed(float deltaTime);
     void AssignUserPointerAndSetCallbacks();
+    void ResetMouseState();
     void SetInitialOrientation(glm::vec3 desiredPosition, float desiredYaw, float desiredPitch);
 
 private:

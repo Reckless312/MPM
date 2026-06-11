@@ -3,9 +3,9 @@
 #include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Program.h"
 
-VideoRecorder::VideoRecorder(const int width, const int height)
+VideoRecorder::VideoRecorder(const int width, const int height, const int durationSeconds)
 {
-    this->totalFrames = Program::recordingFrameRate * Program::recordingDurationSeconds;
+    this->totalFrames = Program::recordingFrameRate * durationSeconds;
 
     this->width = width;
     this->height = height;
@@ -58,6 +58,16 @@ bool VideoRecorder::IsDone() const
     return this->frameCount >= this->totalFrames;
 }
 
+int VideoRecorder::GetFrameCount() const
+{
+    return this->frameCount;
+}
+
+int VideoRecorder::GetTotalFrames() const
+{
+    return this->totalFrames;
+}
+
 void VideoRecorder::EndFrame()
 {
     glBindBuffer(GL_PIXEL_PACK_BUFFER, this->pbos[this->pboIndex]);
@@ -82,8 +92,6 @@ void VideoRecorder::EndFrame()
 
     this->pboIndex = readIndex;
     this->frameCount++;
-
-    printf("Frame %d / %d\n", this->frameCount, this->totalFrames);
 }
 
 void VideoRecorder::BeginFrame() const

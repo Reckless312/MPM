@@ -6,6 +6,7 @@
 #include "OpenGL/Render/Particle.h"
 #include "OpenGL/Shaders/Shader.h"
 #include "OpenGL/Simulation/SnowVolume.h"
+#include "OpenGL/Simulation/SimulationConfig.h"
 
 namespace Snowfall
 {
@@ -20,7 +21,7 @@ namespace Snowfall
 
     inline constexpr int maxParticleCount = 64000;
     inline constexpr int particleBatchCount = 320;
-    inline constexpr int spawnIntervalFrames = 30;
+    inline constexpr int spawnIntervalSubsteps = 180;
     
     inline constexpr float snowDensity = 100.0f;
 
@@ -42,7 +43,7 @@ namespace Snowfall
 
     inline void SpawnIfPossible(Simulation* simulation, Particle* particles)
     {
-        if (spawnFrameCounter == 0)
+        if (spawnFrameCounter <= 0)
         {
             SnowVolume batch(boxLeftCorner, boxRightCorner, particleBatchCount, snowDensity);
 
@@ -50,9 +51,11 @@ namespace Snowfall
             batch.BuildParticleBlocks();
 
             simulation->AddParticles(batch);
+
+            spawnFrameCounter = spawnIntervalSubsteps;
         }
 
-        spawnFrameCounter = (spawnFrameCounter + 1) % spawnIntervalFrames;
+        spawnFrameCounter -= SimulationConfig::simulationSubsteps;
         particles->SetCount(simulation->GetParticleCount());
     }
 }

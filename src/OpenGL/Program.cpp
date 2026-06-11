@@ -40,13 +40,7 @@ void Program::InitializeGLFW()
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, Program::majorVersion);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, Program::minorVersion);
-
     glfwWindowHint(GLFW_OPENGL_PROFILE, Program::profile);
-
-    if (Program::recordingMode)
-    {
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-    }
 }
 
 void Program::LoadGladLibrary()
@@ -101,14 +95,44 @@ bool Program::IsInfoVisible() const
     return this->showInfo;
 }
 
+void Program::InitializeImGui() const
+{
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::GetIO().Fonts->AddFontDefault()->Scale = 1.5f;
+    ImGui_ImplGlfw_InitForOpenGL(this->window, false);
+    ImGui_ImplOpenGL3_Init("#version 330");
+}
+
+void Program::ShutdownImGui() const
+{
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+}
+
+void Program::StartRecording()
+{
+    Program::recordingActive = true;
+
+    SimulationConfig::simulationSubsteps = static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * SimulationConfig::physicsTimeStep)));
+}
+
+void Program::StopRecording() const
+{
+    Program::recordingActive = false;
+
+    SimulationConfig::simulationSubsteps = SimulationConfig::defaultSimulationSubsteps;
+
+    if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(this->window)))
+    {
+        camera->ResetMouseState();
+    }
+}
+
 int Program::GetActiveScene() const
 {
     return this->activeScene;
-}
-
-int Program::GetRecordingScene() const
-{
-    return this->recordingScene;
 }
 
 void Program::UpdateDeltaTime()
@@ -117,7 +141,6 @@ void Program::UpdateDeltaTime()
 
     this->deltaTime = currentFrame - this->lastFrame;
     this->lastFrame = currentFrame;
-
 }
 
 void Program::LockCursor() const
@@ -130,11 +153,6 @@ void Program::LockCursor() const
     }
 }
 
-void Program::SetRecordingScene(const int scene)
-{
-    this->recordingScene = scene;
-}
-
 void Program::CreateWindowAndAssignContext()
 {
     GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
@@ -143,14 +161,7 @@ void Program::CreateWindowAndAssignContext()
     Program::currentWidth = videoMode->width;
     Program::currentHeight = videoMode->height;
 
-    GLFWmonitor* monitor = primaryMonitor;
-
-    if (Program::recordingMode)
-    {
-        monitor = nullptr;
-    }
-
-    this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, monitor, Program::windowToShareResources);
+    this->window = glfwCreateWindow(Program::currentWidth, Program::currentHeight, Program::windowTitle, primaryMonitor, Program::windowToShareResources);
 
     if (this->window == nullptr)
     {
@@ -177,17 +188,6 @@ void Program::SetSceneUniforms(const Shader& shader) const
     }
 }
 
-void Program::AdvanceRecordingScene(Simulation& simulation, Particle& particles, const std::array<const MeshSDF*, 3>& boundarySDFs, const std::array<const SnowVolume*, 3>& snowVolumes, const std::array<int, 3>& maxCapacities, std::unique_ptr<VideoRecorder>& recorder)
-{
-    const int nextScene = this->recordingScene + 1;
-    this->SetRecordingScene(nextScene);
-
-    this->ChangeScene(nextScene, simulation, *boundarySDFs[nextScene - 1], particles, *snowVolumes[nextScene - 1], maxCapacities[nextScene - 1]);
-
-    recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
-    recorder->Open(Program::sceneOutputPaths[nextScene - 1]);
-}
-
 void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF& boundarySDF, Particle& particles, const SnowVolume& snowVolume, const int maxCapacity)
 {
     simulation.UnregisterVBO();
@@ -208,6 +208,8 @@ void Program::ChangeScene(const int scene, Simulation& simulation, const MeshSDF
 
     particles.SetCount(simulation.GetParticleCount());
 
+    simulation.SyncPositionsToVBO();
+
     Camera::ChangeOrientationOnScene(this->window, this->activeScene);
 }
 
@@ -226,6 +228,28 @@ void Program::ProcessInput(Simulation& simulation, Particle& particles, const st
     if (this->IsKeyJustPressed(GLFW_KEY_TAB))
     {
         this->showInfo = !this->showInfo;
+    }
+
+    if (this->IsKeyJustPressed(GLFW_KEY_R) && !Program::recordingActive)
+    {
+        this->ChangeScene(this->activeScene, simulation, *boundarySDFs[this->activeScene - 1], particles, *snowVolumes[this->activeScene - 1], maxCapacities[this->activeScene - 1]);
+
+        if (this->activeScene == 2)
+        {
+            SnowSled::sledCenterZ = SnowSled::sledInitialZ;
+            SnowSled::sledAccumulatedZ = 0.0f;
+        }
+
+        if (this->activeScene == 3)
+        {
+            Snowfall::spawnFrameCounter = 0;
+        }
+
+        this->recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight, Program::recordingDurationSeconds[this->activeScene - 1]);
+        this->recorder->Open(Program::sceneOutputPaths[this->activeScene - 1]);
+
+        Program::StartRecording();
+        this->showInfo = true;
     }
 
     if (this->IsKeyJustPressed(GLFW_KEY_1))

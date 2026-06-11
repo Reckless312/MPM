@@ -26,7 +26,7 @@ namespace SimulationConfig
     inline float boundaryFriction = 0.8f;
     
     inline int defaultSimulationSubsteps = 6;
-    inline int simulationSubsteps = Program::recordingMode ? static_cast<int>(std::roundf(1.0f / (static_cast<float>(Program::recordingFrameRate) * SimulationConfig::physicsTimeStep))) : defaultSimulationSubsteps;
+    inline int simulationSubsteps = defaultSimulationSubsteps;
 
     inline void UpdateParameters(const float newFirstLameParameter, const float newSecondLameParameter, const float newHardeningCoefficient, const float newCriticalCompression, const float newCriticalStretch, const float newBoundaryFriction)
     {

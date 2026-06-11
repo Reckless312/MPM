@@ -79,6 +79,11 @@ void Camera::ScrollCallback(GLFWwindow *window, double xOffset, const double yOf
 
 void Camera::MouseCallback(GLFWwindow *window, const double xPosition, const double yPosition)
 {
+    if (Program::recordingActive)
+    {
+        return;
+    }
+
     if (auto* camera = static_cast<Camera*>(glfwGetWindowUserPointer(window)))
     {
         camera->UpdateMousePosition(static_cast<float>(xPosition), static_cast<float>(yPosition));
@@ -133,6 +138,11 @@ void Camera::AssignUserPointerAndSetCallbacks()
 
     glfwSetCursorPosCallback(this->window, Camera::MouseCallback);
     glfwSetScrollCallback(this->window, Camera::ScrollCallback);
+}
+
+void Camera::ResetMouseState()
+{
+    this->firstMouse = true;
 }
 
 void Camera::SetInitialOrientation(const glm::vec3 desiredPosition, const float desiredYaw, const float desiredPitch)

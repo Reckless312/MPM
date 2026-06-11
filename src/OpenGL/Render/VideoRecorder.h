@@ -7,10 +7,12 @@
 class VideoRecorder
 {
 public:
-    VideoRecorder(int width, int height);
+    VideoRecorder(int width, int height, int durationSeconds);
     ~VideoRecorder();
 
     [[nodiscard]] bool IsDone() const;
+    [[nodiscard]] int GetFrameCount() const;
+    [[nodiscard]] int GetTotalFrames() const;
 
     void EndFrame();
     void BeginFrame() const;

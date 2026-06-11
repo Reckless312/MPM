@@ -15,7 +15,6 @@
 #include "OpenGL/Render/Model.h"
 #include "OpenGL/Render/ShellTexture.h"
 #include "OpenGL/Render/Particle.h"
-#include "OpenGL/Render/VideoRecorder.h"
 #include "OpenGL/Scene/Camera.h"
 #include "OpenGL/Scene/LogoSnowfall.h"
 #include "OpenGL/Scene/SceneLighting.h"
@@ -42,12 +41,7 @@ int main()
         return Program::ReportErrorAndTerminate(exception);
     }
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::GetIO().Fonts->AddFontDefault()->Scale = 1.5f;
-    ImGui_ImplGlfw_InitForOpenGL(program.window, false);
-    ImGui_ImplOpenGL3_Init("#version 330");
-
+    program.InitializeImGui();
     program.LockCursor();
     program.SetViewportAndResizeCallback();
 
@@ -132,20 +126,6 @@ int main()
 
     camera.SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
 
-    std::unique_ptr<VideoRecorder> recorder = std::make_unique<VideoRecorder>(Program::currentWidth, Program::currentHeight);
-
-    if (Program::recordingMode)
-    {
-        try
-        {
-            recorder->Open(Program::logoSceneOutputPath);
-        }
-        catch (const MPMException& exception)
-        {
-            return Program::ReportErrorAndTerminate(exception);
-        }
-    }
-
     std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
     std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &doomSDF };
     std::array maxCapacities = { LogoSnowfall::particleCount, SnowSled::particleCount, Snowfall::maxParticleCount };
@@ -160,10 +140,22 @@ int main()
     while (!glfwWindowShouldClose(program.window))
     {
         program.UpdateDeltaTime();
-        program.ProcessInput(simulation, particles, boundarySDFs, snowVolumes, maxCapacities);
+
+        try
+        {
+            program.ProcessInput(simulation, particles, boundarySDFs, snowVolumes, maxCapacities);
+        }
+        catch (const MPMException& exception)
+        {
+            return Program::ReportErrorAndTerminate(exception);
+        }
 
         camera.UpdateSpeed(program.deltaTime);
-        camera.ProcessInput();
+
+        if (!Program::recordingActive)
+        {
+            camera.ProcessInput();
+        }
 
         if (!program.IsPaused())
         {
@@ -188,13 +180,13 @@ int main()
 
                 simulation.Step();
             }
+
+            simulation.SyncPositionsToVBO();
         }
 
-        simulation.SyncPositionsToVBO();
-
-        if (Program::recordingMode)
+        if (Program::recordingActive)
         {
-            recorder->BeginFrame();
+            program.recorder->BeginFrame();
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -229,76 +221,62 @@ int main()
         shellTexture.Bind(shellShader);
         shellTexture.DrawParticles(shellShader, particles);
 
-        if (!Program::recordingMode)
-        {
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-
-            if (program.IsInfoVisible())
-            {
-                ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
-                ImGui::Begin("Info");
-                ImGui::Text("FPS: %.1f", 1.0f / program.deltaTime);
-                ImGui::Separator();
-                ImGui::Text("1: Logo Scene");
-                ImGui::Text("2: Sled Scene");
-                ImGui::Text("3: Snowfall Scene");
-                ImGui::Text("Space: Pause");
-                ImGui::Text("Tab: Hide");
-                ImGui::Text("Esc: Quit");
-                ImGui::End();
-            }
-
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            glfwSwapBuffers(program.window);
-            glfwPollEvents();
-            continue;
-        }
-
-        try
-        {
-            recorder->EndFrame();
-        }
-        catch (const MPMException& exception)
-        {
-            return Program::ReportErrorAndTerminate(exception);
-        }
-
-        if (!recorder->IsDone())
-        {
-            glfwPollEvents();
-            continue;
-        }
-
-        if (program.GetRecordingScene() < 3)
+        if (Program::recordingActive)
         {
             try
             {
-                program.AdvanceRecordingScene(simulation, particles, boundarySDFs, snowVolumes, maxCapacities, recorder);
+                program.recorder->EndFrame();
             }
             catch (const MPMException& exception)
             {
                 return Program::ReportErrorAndTerminate(exception);
             }
 
-            if (program.GetRecordingScene() == 2)
+            if (program.recorder->IsDone())
             {
-                SnowSled::sledCenterZ = SnowSled::sledInitialZ;
-                SnowSled::sledAccumulatedZ = 0.0f;
+                program.StopRecording();
             }
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         }
-        else
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        if (program.IsInfoVisible())
         {
-            break;
+            ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
+            ImGui::Begin("Info");
+
+            if (Program::recordingActive)
+            {
+                ImGui::Text("Recording: %d / %d", program.recorder->GetFrameCount(), program.recorder->GetTotalFrames());
+            }
+            else
+            {
+                ImGui::Text("FPS: %.1f", 1.0f / program.deltaTime);
+                ImGui::Separator();
+                ImGui::Text("1: Logo Scene");
+                ImGui::Text("2: Sled Scene");
+                ImGui::Text("3: Snowfall Scene");
+                ImGui::Text("Space: Pause");
+                ImGui::Text("R: Record Scene");
+                ImGui::Text("Tab: Hide");
+                ImGui::Text("Esc: Quit");
+            }
+
+            ImGui::End();
         }
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        glfwSwapBuffers(program.window);
+        glfwPollEvents();
     }
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    program.ShutdownImGui();
 
     return 0;
 }
