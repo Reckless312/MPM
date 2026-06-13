@@ -30,8 +30,15 @@ int SnowVolume::GetParticleCount() const
     return this->particleCount;
 }
 
+int SnowVolume::PadToBlockSize(const int count)
+{
+    return ((count + 31) / 32) * 32;
+}
+
 void SnowVolume::BuildInitialPositions()
 {
+    this->particleCount = SnowVolume::PadToBlockSize(this->particleCount);
+
     this->particleVolume = SimulationConfig::cellSize * SimulationConfig::cellSize * SimulationConfig::cellSize;
     this->particleMass = this->snowDensity * this->particleVolume;
 

@@ -56,11 +56,8 @@ void Program::SetFloorUniforms(const Shader &shader)
     const glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(SimulationConfig::gridSize, 1.0f, SimulationConfig::gridSize));
     const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
 
-    constexpr glm::vec3 objectColor = glm::vec3(0.12f, 0.18f, 0.28f);
-
     shader.SetMat4("model", model);
     shader.SetMat3("normalMatrix", normal);
-    shader.SetVec3("objectColor", objectColor);
 }
 
 void Program::ResizeWindow(GLFWwindow *window, const int width, const int height)
@@ -104,7 +101,7 @@ void Program::InitializeImGui() const
     ImGui_ImplOpenGL3_Init("#version 330");
 }
 
-void Program::ShutdownImGui() const
+void Program::ShutdownImGui()
 {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();

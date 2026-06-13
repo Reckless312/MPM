@@ -36,7 +36,7 @@ public:
     inline static int currentHeight = 600;
     inline static bool recordingActive = false;
     inline static int recordingFrameRate = 144;
-    inline static std::array<int, 3> recordingDurationSeconds = { 10, 5, 60 };
+    inline static std::array<int, 3> recordingDurationSeconds = { 10, 5, 10 };
 
     float deltaTime = 0.0f;
 
@@ -58,7 +58,7 @@ public:
     void UpdateDeltaTime();
     void LockCursor() const;
     void InitializeImGui() const;
-    void ShutdownImGui() const;
+    static void ShutdownImGui() ;
     static void StartRecording();
     void StopRecording() const;
     void CreateWindowAndAssignContext();

@@ -24,7 +24,7 @@ namespace SnowSled
     inline constexpr float sledEndZ = boxRightCorner.z + zMargin;
     inline constexpr float sledInitialZ = boxLeftCorner.z - zMargin;
 
-    inline constexpr int particleCount = 60000;
+    inline constexpr int particleCount = 25000000;
     inline constexpr glm::vec3 sledScale(1.5f, 1.5f, 1.5f);
 
     inline float sledAccumulatedZ = 0.0f;

@@ -65,14 +65,14 @@ int main()
 
     Model logoUBB("/Logo/ubb_logo.obj");
     Model sled("/Sled/sled.obj");
-    Model doom("/Doom/doom.obj");
+    Model hollowKnight("/Hollow_Knight/hollow_knight.obj");
     Model floorModel("/Floor/floor.obj");
 
     try
     {
         logoUBB.loadModel();
         sled.loadModel();
-        doom.loadModel();
+        hollowKnight.loadModel();
         floorModel.loadModel();
     }
     catch (const MPMException& exception)
@@ -117,7 +117,7 @@ int main()
     const glm::mat4 sledModelMatrix = SnowSled::GetSledModelMatrix();
     MeshSDF sledSDF = MeshBoundary::BuildSDF(sled.GetTriangles(sledModelMatrix));
 
-    MeshSDF doomSDF = MeshBoundary::BuildSDF(doom.GetTriangles(Snowfall::GetDoomModelMatrix()));
+    MeshSDF hollowKnightSDF = MeshBoundary::BuildSDF(hollowKnight.GetTriangles(Snowfall::GetConiferModelMatrix()));
 
     Particle particles(logoSnowfall.GetInitialPositions());
 
@@ -127,8 +127,8 @@ int main()
     camera.SetInitialOrientation(LogoSnowfall::cameraPosition, LogoSnowfall::cameraYaw, LogoSnowfall::cameraPitch);
 
     std::array<const SnowVolume*, 3> snowVolumes = { &logoSnowfall, &snowSledLayer, &snowfall };
-    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &doomSDF };
-    std::array maxCapacities = { LogoSnowfall::particleCount, SnowSled::particleCount, Snowfall::maxParticleCount };
+    std::array<const MeshSDF*, 3> boundarySDFs = { &logoSDF, &sledSDF, &hollowKnightSDF };
+    std::array maxCapacities = { logoSnowfall.GetParticleCount(), snowSledLayer.GetParticleCount(), SnowVolume::PadToBlockSize(Snowfall::maxParticleCount) };
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -136,6 +136,9 @@ int main()
     glm::vec4 backgroundColor(0.04f, 0.07f, 0.15f, 1.0f);
 
     glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
+
+    float fpsAccumulator = 0.0f;
+    int fpsFrameCount = 0;
 
     while (!glfwWindowShouldClose(program.window))
     {
@@ -211,8 +214,8 @@ int main()
 
         if (program.GetActiveScene() == 3)
         {
-            Snowfall::SetDoomUniforms(sceneShader);
-            doom.Draw(sceneShader);
+            Snowfall::SetConiferUniforms(sceneShader);
+            hollowKnight.Draw(sceneShader);
         }
 
         shellShader.Use();
@@ -274,6 +277,16 @@ int main()
 
         glfwSwapBuffers(program.window);
         glfwPollEvents();
+
+        fpsAccumulator += program.deltaTime;
+        fpsFrameCount++;
+
+        if (fpsAccumulator >= 1.0f)
+        {
+            std::cout << "FPS: " << fpsFrameCount << "\n";
+            fpsAccumulator = 0.0f;
+            fpsFrameCount = 0;
+        }
     }
 
     program.ShutdownImGui();

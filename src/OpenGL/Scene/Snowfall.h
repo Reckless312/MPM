@@ -12,29 +12,29 @@ namespace Snowfall
 {
     inline constexpr glm::vec3 boxLeftCorner(1.0f, 4.0f, 1.0f);
     inline constexpr glm::vec3 boxRightCorner(4.1f, 4.02f, 4.1f);
-    inline constexpr glm::vec3 doomPosition(2.56f, 1.0f, 2.56f);
-    inline constexpr glm::vec3 doomScale(4.0f, 4.0f, 4.0f);
-
+    inline constexpr glm::vec3 coniferPosition(2.56f, 1.0f, 2.56f);
+    inline constexpr glm::vec3 coniferScale(1.0f / 10.0f);
     inline constexpr glm::vec3 cameraPosition(2.64f, 2.83f, 7.46f);
+
     inline constexpr float cameraYaw = -90.2f;
     inline constexpr float cameraPitch = -17.7f;
 
-    inline constexpr int maxParticleCount = 64000;
-    inline constexpr int particleBatchCount = 320;
+    inline constexpr int maxParticleCount = 960000;
+    inline constexpr int particleBatchCount = 48;
     inline constexpr int spawnIntervalSubsteps = 180;
     
     inline constexpr float snowDensity = 100.0f;
 
     inline int spawnFrameCounter = 0;
 
-    inline glm::mat4 GetDoomModelMatrix()
+    inline glm::mat4 GetConiferModelMatrix()
     {
-        return glm::scale(glm::translate(glm::mat4(1.0f), doomPosition), doomScale);
+        return glm::scale(glm::translate(glm::mat4(1.0f), coniferPosition), coniferScale);
     }
 
-    inline void SetDoomUniforms(const Shader& shader)
+    inline void SetConiferUniforms(const Shader& shader)
     {
-        const glm::mat4 model = GetDoomModelMatrix();
+        const glm::mat4 model = GetConiferModelMatrix();
         const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
 
         shader.SetMat4("model", model);

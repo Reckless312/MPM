@@ -14,9 +14,9 @@ namespace SimulationConfig
     inline constexpr float cellSize = 0.02f;
     inline constexpr float gridSize = cellCountPerAxis * cellSize;
 
-    inline static float physicsTimeStep = 3e-4f;
+    //inline static float physicsTimeStep = 3e-4f;
     //inline static float physicsTimeStep = 1e-4f;
-    //inline static float physicsTimeStep = 5e-5f;
+    inline static float physicsTimeStep = 5e-5f;
 
     inline float firstLameParameter = 3.889e4f;
     inline float secondLameParameter = 5.833e4f;

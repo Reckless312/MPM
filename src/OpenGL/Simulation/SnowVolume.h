@@ -17,6 +17,8 @@ public:
 
     [[nodiscard]] int GetParticleCount() const;
 
+    [[nodiscard]] static int PadToBlockSize(int count);
+
     void BuildInitialPositions();
     void BuildParticleBlocks();
 

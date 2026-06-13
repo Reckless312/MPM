@@ -14,24 +14,23 @@ namespace LogoSnowfall
     inline constexpr float cameraPitch = 0.0f;
     inline constexpr float snowDensity = 400.0f;
 
-    inline constexpr int particleCount = 60000;
+    inline constexpr int particleCount = 10000;
 
     inline glm::mat4 GetLogoModelMatrix()
     {
-        constexpr glm::mat4 logoTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(1.3f, 1.2f, 2.56f));
+        constexpr glm::mat4 logoTranslation = glm::translate(glm::mat4(1.0f), glm::vec3(2.0f, 1.2f, 2.56f));
         const glm::mat4 logoRotation = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+        const glm::mat4 logoScale = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f / 2.5f));
 
-        return logoTranslation * logoRotation;
+        return logoTranslation * logoRotation * logoScale;
     }
 
     inline void SetLogoUniforms(const Shader &shader, const glm::mat4 &model)
     {
         const glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
-        constexpr glm::vec3 objectColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
         shader.SetMat4("model", model);
         shader.SetMat3("normalMatrix", normal);
-        shader.SetVec3("objectColor", objectColor);
     }
 }
 

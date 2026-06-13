@@ -22,13 +22,11 @@ in vec2 TextureCoords;
 
 out vec4 FragmentColor;
 
-uniform vec3 objectColor;
 uniform vec3 viewPosition;
 
 uniform DirectionalLight directionalLight;
 
 uniform Material material;
-uniform bool hasDiffuseTexture;
 
 vec3 CalculateRegularAmbient(vec3 lightAmbient);
 vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse);
@@ -59,12 +57,7 @@ vec3 CalculateDirectionalLight(DirectionalLight light, vec3 normal, vec3 viewDir
 
 vec3 CalculateRegularAmbient(vec3 lightAmbient)
 {
-    vec3 color = objectColor;
-
-    if (hasDiffuseTexture)
-    {
-        color = vec3(texture(material.texture_diffuse1, TextureCoords));
-    }
+    vec3 color = vec3(texture(material.texture_diffuse1, TextureCoords));
 
     return lightAmbient * color;
 }
@@ -73,23 +66,13 @@ vec3 CalculateRegularDiffuse(vec3 normal, vec3 lightDirection, vec3 lightDiffuse
 {
     float diffuseImpact = max(dot(normal, lightDirection), 0.0);
 
-    vec3 color = objectColor;
-
-    if (hasDiffuseTexture)
-    {
-        color = vec3(texture(material.texture_diffuse1, TextureCoords));
-    }
+    vec3 color = vec3(texture(material.texture_diffuse1, TextureCoords));
 
     return lightDiffuse * diffuseImpact * color;
 }
 
 vec3 CalculateRegularSpecular(vec3 normal, vec3 lightDirection, vec3 lightSpecular, vec3 viewDirection)
 {
-    if (!hasDiffuseTexture)
-    {
-        return vec3(0.0);
-    }
-
     vec3 reflectionDirection = reflect(-lightDirection, normal);
 
     float specularImpact = pow(max(dot(viewDirection, reflectionDirection), 0.0), material.shininess);
