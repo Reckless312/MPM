@@ -17,7 +17,6 @@ sudo pacman -S cuda glfw glm assimp
 ## System Specifications
 
 ![img_4.png](spec.png)
-flow_chart.png
 ## Results (Offline Simulation)
 
 ### Stiff Snowfall
